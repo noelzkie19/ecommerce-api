@@ -17,6 +17,7 @@ export interface Product {
   rating: number | null;
   reviewCount: number | null;
   originalPrice: number | null;
+  affiliateLink: string | null;
   createdAt: string;
   images: ProductImage[];
 }
@@ -36,6 +37,7 @@ export interface CreateProductDto {
   rating?: number | null;
   review_count?: number | null;
   original_price?: number | null;
+  affiliate_link?: string | null;
 }
 
 export interface UpdateProductDto {
@@ -48,6 +50,7 @@ export interface UpdateProductDto {
   rating?: number | null;
   review_count?: number | null;
   original_price?: number | null;
+  affiliate_link?: string | null;
 }
 
 export interface AddProductImagesDto {

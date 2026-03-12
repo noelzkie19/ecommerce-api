@@ -2,50 +2,32 @@ import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
 import { AppError } from "../../common/utils/AppError";
-import { CartOwner } from "../cart/cart.types";
-import { CreateOrderDTO, OrderStatus } from "./order.types";
+import { resolveOwner } from "../../common/resolvers/owner.resolver";
+import {
+  validateCreateOrder,
+  validateUpdateOrderStatus,
+  validateIntentIdParam,
+  validateOrderIdParam,
+  validatePaginatedQuery,
+} from "../../common/validators/order.validator";
+import { OrderStatus } from "./order.types";
 import * as orderService from "./order.service";
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const VALID_STATUSES: OrderStatus[] = [
+const VALID_STATUSES = new Set<OrderStatus>([
   "pending",
   "confirmed",
   "processing",
   "shipped",
   "delivered",
   "cancelled",
-];
-
-const resolveOwner = (req: Request): CartOwner => {
-  if (req.user?.id) return { userId: req.user.id };
-
-  const guestId = req.headers["x-guest-id"];
-  if (typeof guestId === "string" && UUID_REGEX.test(guestId)) {
-    return { guestId };
-  }
-
-  throw new AppError(
-    "A valid x-guest-id header (UUID) is required for guest order access",
-    400,
-  );
-};
+]);
 
 // ── Place Order ───────────────────────────────────────────────────────────────
 
 export const placeOrder = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const owner = resolveOwner(req);
-    const dto = req.body as CreateOrderDTO;
-
-    if (!dto.fullName) throw new AppError("fullName is required", 400);
-    if (!dto.email) throw new AppError("email is required", 400);
-    if (!dto.phoneNumber) throw new AppError("phoneNumber is required", 400);
-    if (!dto.shippingAddress)
-      throw new AppError("shippingAddress is required", 400);
-    if (!dto.paymentMethod)
-      throw new AppError("paymentMethod is required", 400);
+    const owner = resolveOwner(req, { required: true });
+    const dto = validateCreateOrder(req.body);
 
     // result = { order, gcashRedirectUrl }
     // gcashRedirectUrl is null for COD/card — frontend ignores it
@@ -58,8 +40,8 @@ export const placeOrder = catchAsync(
 
 export const getOrder = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const id = String(req.params.id);
-    const owner = resolveOwner(req);
+    const { id } = validateOrderIdParam(req.params);
+    const owner = resolveOwner(req, { required: true });
     const order = await orderService.getOrder(id);
 
     if (!order) throw new AppError("Order not found", 404);
@@ -79,7 +61,7 @@ export const getOrder = catchAsync(
 
 export const getOrders = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const owner = resolveOwner(req);
+    const owner = resolveOwner(req, { required: true });
     const orders = await orderService.getOrders(owner);
     sendSuccess(res, orders);
   },
@@ -89,7 +71,7 @@ export const getOrders = catchAsync(
 
 export const getOrderAdmin = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const id = String(req.params.id);
+    const { id } = validateOrderIdParam(req.params);
     const order = await orderService.getOrder(id);
     if (!order) throw new AppError("Order not found", 404);
     sendSuccess(res, order);
@@ -100,19 +82,14 @@ export const getOrderAdmin = catchAsync(
 
 export const getAllOrders = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const rawPage = typeof req.query.page === "string" ? req.query.page : "1";
-    const rawLimit =
-      typeof req.query.limit === "string" ? req.query.limit : "10";
-    const page = Math.max(1, Number.parseInt(rawPage, 10));
-    const limit = Math.min(100, Math.max(1, Number.parseInt(rawLimit, 10)));
+    const { page, limit, status } = validatePaginatedQuery(req.query);
 
-    const rawStatus = req.query.status as string | undefined;
-    const status =
-      rawStatus && VALID_STATUSES.includes(rawStatus as OrderStatus)
-        ? (rawStatus as OrderStatus)
+    const validStatus =
+      status && VALID_STATUSES.has(status as OrderStatus)
+        ? (status as OrderStatus)
         : undefined;
 
-    const result = await orderService.getAllOrders(page, limit, status);
+    const result = await orderService.getAllOrders(page, limit, validStatus);
     sendSuccess(res, result);
   },
 );
@@ -121,15 +98,8 @@ export const getAllOrders = catchAsync(
 
 export const updateOrderStatus = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const id = String(req.params.id);
-    const { status } = req.body as { status: OrderStatus };
-
-    if (!status) throw new AppError("status is required", 400);
-    if (!VALID_STATUSES.includes(status))
-      throw new AppError(
-        `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`,
-        400,
-      );
+    const { id } = validateOrderIdParam(req.params);
+    const { status } = validateUpdateOrderStatus(req.body);
 
     const order = await orderService.updateOrderStatus(id, status);
     sendSuccess(res, order, "Order status updated successfully");
@@ -140,8 +110,7 @@ export const updateOrderStatus = catchAsync(
 
 export const verifyGCashPayment = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const intentId = String(req.params.intentId);
-    if (!intentId) throw new AppError("intentId is required", 400);
+    const { intentId } = validateIntentIdParam(req.params);
 
     const result = await orderService.verifyGCashPayment(intentId);
     sendSuccess(res, result, "Payment verified");

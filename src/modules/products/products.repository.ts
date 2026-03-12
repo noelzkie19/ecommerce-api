@@ -106,6 +106,7 @@ export const create = async (dto: CreateProductDto) => {
     rating: dto.rating ?? null,
     review_count: dto.review_count ?? null,
     original_price: dto.original_price ?? null,
+    affiliate_link: dto.affiliate_link ?? null,
   };
 
   const { data, error } = await supabase
@@ -130,6 +131,7 @@ export const update = async (id: string, dto: UpdateProductDto) => {
       rating: dto.rating,
       review_count: dto.review_count,
       original_price: dto.original_price,
+      affiliate_link: dto.affiliate_link,
     }).filter(([, v]) => v !== undefined),
   );
 
