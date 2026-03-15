@@ -262,10 +262,6 @@ export const paymongoWebhook = catchAsync(
       const userId = metadata?.user_id;
 
       if (intentId && userId) {
-        console.log("[Affiliate Webhook] Processing payment:", {
-          intentId,
-          userId,
-        });
         await affiliateService.verifyAffiliatePayment(intentId, userId);
       } else {
         console.warn(
