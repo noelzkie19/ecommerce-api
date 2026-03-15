@@ -1,13 +1,18 @@
-export type AffiliateStatus = "active" | "suspended";
+export type AffiliateStatus = "pending" | "active" | "suspended";
 export type CommissionType = "percentage" | "fixed";
+export type PaymentStatus = "unpaid" | "paid";
 
 // ── Affiliate ─────────────────────────────────────────────────────────────────
 
 export interface Affiliate {
   id: string;
+  userId: string | null; // ← linked auth.users id
   name: string;
   email: string;
   status: AffiliateStatus;
+  paymentStatus: PaymentStatus; // ← whether affiliate has paid
+  pixelId?: string; // ← Meta Pixel ID for tracking
+  storeId?: string; // ← Store ID for affiliate
   createdAt: string;
   updatedAt: string;
   /** Derived / joined fields returned by the repository */
@@ -35,15 +40,24 @@ export interface AffiliateProduct {
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
+/**
+ * Admin provides an email; the service looks it up in auth.users
+ * and pulls name + user_id automatically.
+ */
 export interface CreateAffiliateDTO {
-  name: string;
   email: string;
+  pixelId?: string; // ← Meta Pixel ID for tracking
+  storeId?: string; // ← Store ID for affiliate
+  status?: AffiliateStatus; // ← Status for auto-creation
 }
 
 export interface UpdateAffiliateDTO {
   name?: string;
   email?: string;
   status?: AffiliateStatus;
+  paymentStatus?: PaymentStatus;
+  pixelId?: string; // ← Meta Pixel ID for tracking
+  storeId?: string; // ← Store ID for affiliate
 }
 
 export interface AssignProductDTO {

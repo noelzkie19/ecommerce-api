@@ -1,5 +1,5 @@
-import { Router } from 'express'
-import { authRateLimiter } from '../../common/middlewares/rateLimiter'
+import { Router } from "express";
+import { authRateLimiter } from "../../common/middlewares/rateLimiter";
 import {
   registerSchema,
   loginSchema,
@@ -7,11 +7,11 @@ import {
   resetPasswordSchema,
   googleLoginSchema,
   validate,
-} from './auth.validation'
-import { requireAuth, requireAdmin } from './auth.middleware'
-import * as authController from './auth.controller'
+} from "./auth.validation";
+import { requireAuth, requireAdmin } from "./auth.middleware";
+import * as authController from "./auth.controller";
 
-const router = Router()
+const router = Router();
 
 /**
  * @openapi
@@ -19,7 +19,6 @@ const router = Router()
  *   post:
  *     tags: [Auth]
  *     summary: Register a new account
- *     description: Creates a new user account. May require email confirmation.
  *     requestBody:
  *       required: true
  *       content:
@@ -30,32 +29,49 @@ const router = Router()
  *             properties:
  *               email:
  *                 type: string
- *                 example: noel@example.com
+ *                 format: email
+ *                 example: john@example.com
  *               password:
  *                 type: string
- *                 example: Password1
- *                 description: Minimum 8 characters, at least one uppercase letter and one number
+ *                 minLength: 8
+ *                 example: Secret123
  *               fullName:
  *                 type: string
- *                 example: Noel Deleon
+ *                 minLength: 2
+ *                 example: John Doe
  *     responses:
  *       201:
  *         description: Account created successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                     fullName:
+ *                       type: string
  *       400:
  *         description: Email already registered
  *       422:
  *         description: Validation error
  */
 router.post(
-  '/register',
+  "/register",
   authRateLimiter,
   validate(registerSchema),
-  authController.register
-)
+  authController.register,
+);
 
 /**
  * @openapi
@@ -63,7 +79,6 @@ router.post(
  *   post:
  *     tags: [Auth]
  *     summary: Login with email and password
- *     description: Authenticates a user and returns access and refresh tokens.
  *     requestBody:
  *       required: true
  *       content:
@@ -74,28 +89,44 @@ router.post(
  *             properties:
  *               email:
  *                 type: string
- *                 example: noel@example.com
+ *                 format: email
+ *                 example: john@example.com
  *               password:
  *                 type: string
- *                 example: Password1
+ *                 example: Secret123
  *     responses:
  *       200:
  *         description: Login successful
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                     fullName:
+ *                       type: string
  *       401:
- *         description: Invalid credentials
+ *         description: Invalid email or password
  *       422:
  *         description: Validation error
  */
 router.post(
-  '/login',
+  "/login",
   authRateLimiter,
   validate(loginSchema),
-  authController.login
-)
+  authController.login,
+);
 
 /**
  * @openapi
@@ -103,7 +134,6 @@ router.post(
  *   post:
  *     tags: [Auth]
  *     summary: Refresh access token
- *     description: Issues a new access and refresh token pair using a valid refresh token.
  *     requestBody:
  *       required: true
  *       content:
@@ -117,15 +147,32 @@ router.post(
  *                 example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
  *     responses:
  *       200:
- *         description: Tokens refreshed successfully
+ *         description: Token refreshed
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                     fullName:
+ *                       type: string
+ *       400:
+ *         description: Refresh token is required
  *       401:
  *         description: Invalid or expired refresh token
  */
-router.post('/refresh', authRateLimiter, authController.refresh)
+router.post("/refresh", authRateLimiter, authController.refresh);
 
 /**
  * @openapi
@@ -133,7 +180,6 @@ router.post('/refresh', authRateLimiter, authController.refresh)
  *   post:
  *     tags: [Auth]
  *     summary: Send password reset email
- *     description: Sends a password reset email if the account exists.
  *     requestBody:
  *       required: true
  *       content:
@@ -144,7 +190,8 @@ router.post('/refresh', authRateLimiter, authController.refresh)
  *             properties:
  *               email:
  *                 type: string
- *                 example: noel@example.com
+ *                 format: email
+ *                 example: john@example.com
  *     responses:
  *       200:
  *         description: If the email exists, a reset link has been sent
@@ -152,11 +199,11 @@ router.post('/refresh', authRateLimiter, authController.refresh)
  *         description: Validation error
  */
 router.post(
-  '/forgot-password',
+  "/forgot-password",
   authRateLimiter,
   validate(forgotPasswordSchema),
-  authController.forgotPassword
-)
+  authController.forgotPassword,
+);
 
 /**
  * @openapi
@@ -164,7 +211,6 @@ router.post(
  *   post:
  *     tags: [Auth]
  *     summary: Reset password
- *     description: Resets user password using a valid reset token.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -177,7 +223,8 @@ router.post(
  *             properties:
  *               password:
  *                 type: string
- *                 example: NewPassword1
+ *                 minLength: 8
+ *                 example: NewSecret123
  *     responses:
  *       200:
  *         description: Password reset successfully
@@ -187,10 +234,10 @@ router.post(
  *         description: Validation error
  */
 router.post(
-  '/reset-password',
+  "/reset-password",
   validate(resetPasswordSchema),
-  authController.resetPassword
-)
+  authController.resetPassword,
+);
 
 /**
  * @openapi
@@ -198,7 +245,6 @@ router.post(
  *   post:
  *     tags: [Auth]
  *     summary: Logout current user
- *     description: Logs out the currently authenticated user session.
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -207,15 +253,14 @@ router.post(
  *       401:
  *         description: Unauthorized
  */
-router.post('/logout', requireAuth, authController.logout)
+router.post("/logout", requireAuth, authController.logout);
 
 /**
  * @openapi
  * /api/auth/admin/logout/{userId}:
  *   post:
  *     tags: [Auth]
- *     summary: Admin logout user
- *     description: Invalidates all sessions for a specific user.
+ *     summary: Admin logout user (invalidate all sessions)
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -224,7 +269,8 @@ router.post('/logout', requireAuth, authController.logout)
  *         required: true
  *         schema:
  *           type: string
- *         description: ID of the user to invalidate sessions for
+ *           format: uuid
+ *         description: The ID of the user whose sessions will be invalidated
  *     responses:
  *       200:
  *         description: User sessions invalidated successfully
@@ -234,11 +280,11 @@ router.post('/logout', requireAuth, authController.logout)
  *         description: Forbidden (admin only)
  */
 router.post(
-  '/admin/logout/:userId',
+  "/admin/logout/:userId",
   requireAuth,
   requireAdmin,
-  authController.adminLogout
-)
+  authController.adminLogout,
+);
 
 /**
  * @openapi
@@ -246,7 +292,6 @@ router.post(
  *   post:
  *     tags: [Auth]
  *     summary: Google OAuth login
- *     description: Find or create user from Google OAuth and return tokens.
  *     requestBody:
  *       required: true
  *       content:
@@ -257,27 +302,50 @@ router.post(
  *             properties:
  *               email:
  *                 type: string
- *                 example: noel@gmail.com
+ *                 format: email
+ *                 example: john@gmail.com
  *               fullName:
  *                 type: string
- *                 example: Noel De Leon
+ *                 example: John Doe
  *               googleId:
  *                 type: string
- *                 example: 108xxxxxxxxxxxxx
+ *                 example: 117056139561154764407
  *     responses:
  *       200:
  *         description: Google login successful
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                     fullName:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                       enum: [admin, user]
+ *       422:
+ *         description: Validation error
+ *       500:
+ *         description: Google login failed
  */
 router.post(
-  '/google',
+  "/google",
   authRateLimiter,
   validate(googleLoginSchema),
-  authController.googleLogin
-)
+  authController.googleLogin,
+);
 
 /**
  * @openapi
@@ -285,14 +353,68 @@ router.post(
  *   get:
  *     tags: [Auth]
  *     summary: Get current user
- *     description: Returns the currently authenticated user.
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: User fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     email:
+ *                       type: string
+ *                     fullName:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                       enum: [admin, user]
  *       401:
  *         description: Unauthorized
  */
-router.get('/me', requireAuth, authController.me)
-export default router
+router.get("/me", requireAuth, authController.me);
+
+/**
+ * @openapi
+ * /api/auth/users:
+ *   get:
+ *     tags: [Auth]
+ *     summary: List all auth users (Admin — for affiliate invite dropdown)
+ *     description: Returns all registered users from auth.users. Used to populate the invite affiliate dropdown.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of auth users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       email:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (admin only)
+ */
+router.get("/users", requireAuth, requireAdmin, authController.getAuthUsers);
+
+export default router;

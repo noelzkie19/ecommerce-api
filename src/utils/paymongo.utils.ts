@@ -51,9 +51,12 @@ interface PayMongoAttachResponse {
   };
 }
 
-// ── 1. Create Payment Intent ──────────────────────────────────────────────────
+// ── 1. Create Payment Intent (Maya Wallet) ───────────────────────────────
 
-export const createPaymentIntent = async (amountInPesos: number) => {
+export const createPaymentIntent = async (
+  amountInPesos: number,
+  metadata?: Record<string, string>,
+) => {
   const res = await fetch(`${PAYMONGO_BASE}/payment_intents`, {
     method: "POST",
     headers: {
@@ -65,8 +68,9 @@ export const createPaymentIntent = async (amountInPesos: number) => {
         attributes: {
           amount: Math.round(amountInPesos * 100), // centavos
           currency: "PHP",
-          payment_method_allowed: ["qrph"],
+          payment_method_allowed: ["maya"],
           capture_type: "automatic",
+          ...(metadata && { metadata }),
         },
       },
     }),
@@ -86,16 +90,20 @@ export const createPaymentIntent = async (amountInPesos: number) => {
   };
 };
 
-// ── 2. Create QR PH Payment Method + Attach ──────────────────────────────────
+// ── 2. Create Maya Wallet Payment Method + Attach ────────────────────────
 
-export const attachGCashToIntent = async (
+/**
+ * Attaches Maya Wallet payment method to a payment intent.
+ * Returns a redirect URL that opens the Maya Wallet app via deep link.
+ */
+export const attachMayaToIntent = async (
   intentId: string,
   clientKey: string,
   email: string,
   name: string,
   returnUrl: string,
 ) => {
-  // Step A — create payment method (type: "qrph")
+  // Step A — create payment method (type: "maya" for Maya Wallet deep link)
   const methodRes = await fetch(`${PAYMONGO_BASE}/payment_methods`, {
     method: "POST",
     headers: {
@@ -105,7 +113,7 @@ export const attachGCashToIntent = async (
     body: JSON.stringify({
       data: {
         attributes: {
-          type: "qrph",
+          type: "maya",
           billing: { name, email },
         },
       },
@@ -157,10 +165,8 @@ export const attachGCashToIntent = async (
 
   return {
     status: attachData.data.attributes.status,
-    // gcash/card: next_action.redirect.url
+    // maya: next_action.redirect.url (deep link to open Maya Wallet app)
     redirectUrl: nextAction?.redirect?.url ?? null,
-    // qrph: next_action.code.image_url (base64 data URI — pass directly to <img src>)
-    qrCodeUrl: nextAction?.code?.image_url ?? null,
   };
 };
 

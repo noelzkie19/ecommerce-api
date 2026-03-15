@@ -11,64 +11,28 @@ const db = supabaseAdmin as any; // remove once supabase types are regenerated
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Enrich raw affiliate rows with aggregate stats:
- *   productCount   – number of assigned products
- *   totalSales     – sum of order_items.unit_price * quantity for confirmed orders
- *   totalCommissions – computed from affiliate commission rules
- */
 async function enrichAffiliates(rows: any[]): Promise<any[]> {
   if (!rows.length) return [];
 
   return Promise.all(
     rows.map(async (aff) => {
-      // Product count
       const { count: productCount } = await db
         .from("affiliate_products")
         .select("id", { count: "exact", head: true })
         .eq("affiliate_id", aff.id);
 
-      // Sales & commissions via affiliate_products → order_items
-      const { data: apRows } = await db
-        .from("affiliate_products")
-        .select(
-          `
-          commission_type,
-          commission_value,
-          product_id,
-          order_items:order_items (
-            quantity,
-            unit_price,
-            order:orders ( status )
-          )
-        `,
-        )
-        .eq("affiliate_id", aff.id);
-
-      let totalSales = 0;
-      let totalCommissions = 0;
-
-      for (const ap of apRows ?? []) {
-        for (const oi of ap.order_items ?? []) {
-          if (
-            oi.order?.status !== "delivered" &&
-            oi.order?.status !== "confirmed"
-          )
-            continue;
-          const lineTotal = oi.unit_price * oi.quantity;
-          totalSales += lineTotal;
-          totalCommissions +=
-            ap.commission_type === "percentage"
-              ? (lineTotal * ap.commission_value) / 100
-              : ap.commission_value * oi.quantity;
-        }
-      }
+      // Use stored totals from the database (updated when sales are approved)
+      // Fallback to 0 if columns don't exist yet
+      const totalSales = aff.total_sales ?? 0;
+      const totalCommissions = aff.total_commissions ?? 0;
+      const paymentStatus = aff.payment_status ?? "unpaid";
 
       return {
         ...aff,
         productCount: productCount ?? 0,
         totalSales,
         totalCommissions,
+        paymentStatus,
       };
     }),
   );
@@ -122,16 +86,51 @@ export const findById = async (id: string) => {
   return enriched;
 };
 
+/**
+ * Look up the email in auth.users first.
+ * - Pulls display_name (or email prefix as fallback) as the affiliate name.
+ * - Stores the auth user's UUID as user_id so the records are linked.
+ * - Throws 404 if the email is not registered in auth.users.
+ * - Throws 409 if already an affiliate.
+ */
 export const create = async (dto: CreateAffiliateDTO) => {
+  // 1. Find the user in auth.users via the admin API
+  const { data: listData, error: listError } =
+    await supabaseAdmin.auth.admin.listUsers();
+
+  if (listError) throw new AppError("Failed to query auth users", 500);
+
+  const authUser = listData.users.find(
+    (u) => u.email?.toLowerCase() === dto.email.toLowerCase(),
+  );
+
+  if (!authUser) {
+    throw new AppError(`No registered user found with email ${dto.email}`, 404);
+  }
+
+  // 2. Derive a display name: user_metadata.full_name → user_metadata.name → email prefix
+  const name: string =
+    authUser.user_metadata?.full_name ??
+    authUser.user_metadata?.name ??
+    authUser.email!.split("@")[0];
+
+  // 3. Insert into affiliates table
   const { data, error } = await db
     .from("affiliates")
-    .insert({ name: dto.name, email: dto.email, status: "active" })
+    .insert({
+      user_id: authUser.id,
+      name,
+      email: authUser.email,
+      status: dto.status || "active",
+      pixel_id: dto.pixelId,
+      store_id: dto.storeId,
+    })
     .select("*")
     .single();
 
   if (error) {
     if (error.code === "23505")
-      throw new AppError("Email already registered as affiliate", 409);
+      throw new AppError("User is already registered as an affiliate", 409);
     throw new AppError(error.message, 500);
   }
 
@@ -145,6 +144,9 @@ export const update = async (id: string, dto: UpdateAffiliateDTO) => {
       name: dto.name,
       email: dto.email,
       status: dto.status,
+      payment_status: dto.paymentStatus,
+      pixel_id: dto.pixelId,
+      store_id: dto.storeId,
     }).filter(([, v]) => v !== undefined),
   );
 
@@ -187,7 +189,6 @@ export const assignProduct = async (
   affiliateId: string,
   dto: AssignProductDTO,
 ) => {
-  // upsert so re-assigning the same product just updates commission
   const { data, error } = await db
     .from("affiliate_products")
     .upsert(
@@ -219,4 +220,126 @@ export const removeProduct = async (affiliateId: string, productId: string) => {
     .eq("product_id", productId);
 
   if (error) throw new AppError("Assignment not found", 404);
+};
+
+// ── Affiliate Totals ───────────────────────────────────────────────────────────
+
+/**
+ * Update affiliate's total sales and total commissions.
+ * Called when an affiliate sale is approved.
+ */
+export const updateTotals = async (
+  affiliateId: string,
+  saleAmount: number,
+  commissionEarned: number,
+) => {
+  // Get current totals
+  const { data: affiliate, error: fetchError } = await db
+    .from("affiliates")
+    .select("total_sales, total_commissions")
+    .eq("id", affiliateId)
+    .single();
+
+  if (fetchError) throw new AppError("Affiliate not found", 404);
+
+  const newTotalSales = (affiliate.total_sales ?? 0) + saleAmount;
+  const newTotalCommissions =
+    (affiliate.total_commissions ?? 0) + commissionEarned;
+
+  const { error: updateError } = await db
+    .from("affiliates")
+    .update({
+      total_sales: newTotalSales,
+      total_commissions: newTotalCommissions,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", affiliateId);
+
+  if (updateError) throw new AppError("Failed to update affiliate totals", 500);
+};
+
+// ── Activate Affiliate by User ID ───────────────────────────────────────────────
+/**
+ * Activate affiliate when they complete their first payment/order
+ */
+export const activateByUserId = async (userId: string) => {
+  const { error } = await db
+    .from("affiliates")
+    .update({ status: "active", updated_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("status", "pending");
+
+  if (error) {
+    console.error("Failed to activate affiliate:", error);
+  }
+};
+
+// ── Mark Affiliate as Paid ─────────────────────────────────────────────────
+/**
+ * Mark affiliate as paid after successful payment
+ */
+export const markAsPaidByUserId = async (userId: string) => {
+  const { error } = await db
+    .from("affiliates")
+    .update({ payment_status: "paid", updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Failed to mark affiliate as paid:", error);
+  }
+};
+
+// ── Find Affiliate by Store ID ─────────────────────────────────────────────
+/**
+ * Find affiliate by store_id (used for ?ref= tracking)
+ */
+export const findByStoreId = async (storeId: string) => {
+  const { data, error } = await db
+    .from("affiliates")
+    .select("id, name, email, status, pixel_id, store_id")
+    .eq("store_id", storeId)
+    .single();
+
+  if (error) return null;
+  return data;
+};
+
+// ── Update Pixel ID by User ID ─────────────────────────────────────────────
+/**
+ * Update pixel_id for the affiliate belonging to the given user
+ */
+export const updatePixelByUserId = async (userId: string, pixelId: string) => {
+  const { data, error } = await db
+    .from("affiliates")
+    .update({ pixel_id: pixelId, updated_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .select("*")
+    .single();
+
+  if (error) throw new AppError("Affiliate not found", 404);
+
+  return {
+    ...data,
+    paymentStatus: data.payment_status ?? "unpaid",
+  };
+};
+
+// ── Find Affiliate by User ID ───────────────────────────────────────────────
+/**
+ * Find affiliate by user_id
+ */
+export const findByUserId = async (userId: string) => {
+  const { data, error } = await db
+    .from("affiliates")
+    .select("*")
+    .eq("user_id", userId)
+    .single();
+
+  if (error) return null;
+
+  // Add camelCase paymentStatus field
+  return {
+    ...data,
+    paymentStatus: data.payment_status ?? "unpaid",
+  };
 };

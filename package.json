@@ -1,7 +1,7 @@
 {
-  "name": "nanuhealth-backend",
+  "name": "triadecomm-backend",
   "version": "1.0.0",
-  "description": "NanuHealth API - Supabase Auth + Google OAuth",
+  "description": "Triad-Ecomm API - Supabase Auth + Google OAuth",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -9,11 +9,14 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
-    "db:types": "supabase gen types typescript --local > src/common/types/supabase.types.ts"
+    "db:types": "supabase gen types typescript --local > src/common/types/supabase.types.ts",
+    "db:migrate": "supabase db push",
+    "db:migration:create": "supabase migration new"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
     "express": "^4.21.0",
@@ -30,6 +33,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/hpp": "^0.2.6",

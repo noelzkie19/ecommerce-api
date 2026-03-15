@@ -5,12 +5,27 @@ import * as paymongoUtils from "../../utils/paymongo.utils";
 import { CartOwner } from "../cart/cart.types";
 import { CreateOrderDTO, OrderStatus, PlaceOrderResult } from "./order.types";
 import { AppError } from "../../common/utils/AppError";
+import * as affiliateSalesService from "../affiliates-sales/affiliate-sales.service";
+import {
+  activateAffiliateByUserId,
+  markAffiliateAsPaidByUserId,
+} from "../affiliates/affiliate.service";
+import * as trackingService from "../affiliate-tracking/affiliate-tracking.service";
+import * as pixelService from "../affiliate-pixel/affiliate-pixel.service";
+import { supabaseAdmin } from "../../config/supabase";
 
 // ── Place Order ───────────────────────────────────────────────────────────────
 
 export const placeOrder = async (
   owner: CartOwner,
   dto: CreateOrderDTO,
+  attributionData?: {
+    affiliateId?: string;
+    pixelId?: string;
+    storeId?: string;
+    clickId?: string;
+    trackingMethod?: string;
+  },
 ): Promise<PlaceOrderResult> => {
   const cartItems = await cartRepository.findAllByOwner(owner);
   if (!cartItems || cartItems.length === 0) {
@@ -18,14 +33,13 @@ export const placeOrder = async (
   }
 
   let paymentIntentId: string | undefined;
-  let gcashRedirectUrl: string | null = null;
-  let gcashQrCodeUrl: string | null = null;
+  let mayaRedirectUrl: string | null = null;
 
   if (dto.paymentMethod === "gcash") {
-    // ── GCash: create & attach PayMongo intent ────────────────────────────────
+    // ── Maya Wallet: create & attach PayMongo intent ────────────────────────────
     // Stock is NOT deducted here — it is deducted in verifyGCashPayment once
     // the payment actually succeeds. This prevents phantom stock holds when
-    // users abandon the GCash flow.
+    // users abandon the Maya Wallet flow.
     const subtotal = cartItems.reduce(
       (sum: number, item: any) => sum + item.product.price * item.quantity,
       0,
@@ -42,7 +56,7 @@ export const placeOrder = async (
     const intent = await paymongoUtils.createPaymentIntent(total);
     paymentIntentId = intent.intentId;
 
-    const { redirectUrl, qrCodeUrl } = await paymongoUtils.attachGCashToIntent(
+    const { redirectUrl } = await paymongoUtils.attachMayaToIntent(
       intent.intentId,
       intent.clientKey,
       dto.email,
@@ -50,23 +64,119 @@ export const placeOrder = async (
       `${appUrl}/checkout/callback?intent_id=${intent.intentId}`,
     );
 
-    gcashRedirectUrl = redirectUrl;
-    gcashQrCodeUrl = qrCodeUrl;
+    mayaRedirectUrl = redirectUrl;
   } else {
     // ── COD / Card: deduct stock immediately ──────────────────────────────────
     await orderRepository.deductStock(cartItems);
+
+    // Mark affiliate as paid and activate for COD orders
+    if (owner.userId) {
+      await markAffiliateAsPaidByUserId(owner.userId);
+      await activateAffiliateByUserId(owner.userId);
+    }
   }
 
-  const order = await orderRepository.createOrder(
+  // Create order with attribution data
+  const order = await createOrderWithAttribution(
     owner,
     dto,
     cartItems,
     paymentIntentId,
+    attributionData,
   );
+
+  // Create attribution record if affiliate is specified
+  if (attributionData?.affiliateId) {
+    try {
+      await trackingService.attributeOrderFromData(order.id, {
+        affiliateId: attributionData.affiliateId,
+        pixelId: attributionData.pixelId,
+        storeId: attributionData.storeId,
+        clickId: attributionData.clickId,
+        trackingMethod: (attributionData.trackingMethod as any) || "url_param",
+      });
+    } catch (error) {
+      console.error("Failed to attribute order to affiliate:", error);
+      // Don't fail the order if attribution fails
+    }
+  }
 
   await cartService.clearCart(owner);
 
-  return { order, gcashRedirectUrl, qrCodeUrl: gcashQrCodeUrl };
+  return { order, mayaRedirectUrl };
+};
+
+// ── Internal: Create Order with Attribution ─────────────────────────────────
+
+const createOrderWithAttribution = async (
+  owner: CartOwner,
+  dto: CreateOrderDTO,
+  cartItems: any[],
+  paymentIntentId?: string,
+  attributionData?: {
+    affiliateId?: string;
+    pixelId?: string;
+    storeId?: string;
+    clickId?: string;
+    trackingMethod?: string;
+  },
+) => {
+  const subtotal = cartItems.reduce(
+    (sum, item) => sum + item.product.price * item.quantity,
+    0,
+  );
+
+  const discount = dto.discount ?? 0;
+  const total = subtotal - discount;
+
+  const orderData: any = {
+    user_id: owner.userId ?? null,
+    guest_id: owner.guestId ?? null,
+    full_name: dto.fullName,
+    email: dto.email,
+    phone_number: dto.phoneNumber,
+    shipping_address: dto.shippingAddress,
+    order_notes: dto.orderNotes ?? null,
+    payment_method: dto.paymentMethod,
+    payment_status: "pending",
+    status: "pending",
+    subtotal,
+    total: total,
+    payment_intent_id: paymentIntentId ?? null,
+  };
+
+  // Add affiliate attribution if present
+  if (attributionData?.affiliateId) {
+    orderData.affiliate_id = attributionData.affiliateId;
+    orderData.tracking_method = attributionData.trackingMethod || "url_param";
+    orderData.click_id = attributionData.clickId || null;
+  }
+
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from("orders")
+    .insert(orderData)
+    .select("id")
+    .single();
+
+  if (orderError) throw new AppError(orderError.message, 500);
+  if (!order) throw new AppError("Failed to create order", 500);
+
+  const orderId = order.id;
+
+  const orderItems = cartItems.map((item) => ({
+    order_id: orderId,
+    product_id: item.product_id ?? item.productId ?? item.product?.id,
+    quantity: item.quantity,
+    unit_price: item.product.price,
+  }));
+
+  const { error: itemsError } = await supabaseAdmin
+    .from("order_items")
+    .insert(orderItems);
+
+  if (itemsError) throw new AppError(itemsError.message, 500);
+
+  return orderRepository.findOrderById(orderId);
 };
 
 // ── Verify GCash Payment (called from callback page + webhook) ────────────────
@@ -90,6 +200,27 @@ export const verifyGCashPayment = async (intentId: string) => {
 
     await orderRepository.updatePaymentStatus(intentId, "paid");
     await orderRepository.updateOrderStatus(order.id, "confirmed");
+    await affiliateSalesService.recordSalesForOrder(order.id);
+
+    // Fire Meta Pixel Purchase event if order has affiliate
+    const orderWithAffiliate = order as any;
+    if (orderWithAffiliate.affiliate_id) {
+      try {
+        await pixelService.firePurchaseEvent(
+          order.id,
+          orderWithAffiliate.affiliate_id,
+        );
+      } catch (error) {
+        console.error("Failed to fire Meta Pixel event:", error);
+        // Don't fail the order if pixel event fails
+      }
+    }
+
+    // Mark affiliate as paid and activate (upgrade from pending to active)
+    if (order.user_id) {
+      await markAffiliateAsPaidByUserId(order.user_id);
+      await activateAffiliateByUserId(order.user_id);
+    }
   } else if (status === "payment_intent.payment_failed") {
     await orderRepository.updatePaymentStatus(intentId, "failed");
     // No stock was deducted for GCash, so no restore needed here
@@ -115,7 +246,24 @@ export const updateOrderStatus = async (id: string, status: OrderStatus) => {
   if (status === "cancelled") {
     await orderRepository.restoreStock(id);
   }
-  return orderRepository.updateOrderStatus(id, status);
+  const updated = await orderRepository.updateOrderStatus(id, status);
+
+  // Record affiliate commissions on delivery
+  if (status === "delivered") {
+    await affiliateSalesService.recordSalesForOrder(id);
+
+    // Fire Meta Pixel Purchase event on delivery if order has affiliate
+    const order = await orderRepository.findOrderById(id);
+    if (order?.affiliate_id) {
+      try {
+        await pixelService.firePurchaseEvent(id, order.affiliate_id);
+      } catch (error) {
+        console.error("Failed to fire Meta Pixel event on delivery:", error);
+      }
+    }
+  }
+
+  return updated;
 };
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
