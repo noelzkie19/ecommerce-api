@@ -1,1 +1,2 @@
-export * from './supabase.types'
+// Export types from individual module type files
+export * from "./express";

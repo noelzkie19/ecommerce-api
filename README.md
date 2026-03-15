@@ -1,2 +1,3 @@
-# nanu-health-back-end
-Nanu Health E-Commerce
+# triadecomm-backend
+
+Triad E-Commerce

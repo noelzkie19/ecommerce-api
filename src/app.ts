@@ -3,10 +3,12 @@ import helmet from "helmet";
 import cors from "cors";
 import hpp from "hpp";
 import swaggerUi from "swagger-ui-express";
+import cookieParser from "cookie-parser";
 import { httpLogger } from "./common/middlewares/logger";
 import { errorHandler } from "./common/middlewares/errorHandler";
 import { generalRateLimiter } from "./common/middlewares/rateLimiter";
 import { sanitizeInput } from "./common/middlewares/sanitize";
+import { affiliateTrackingMiddleware } from "./common/middlewares/affiliateTracking";
 import { env } from "./config/env";
 
 // Routes
@@ -19,13 +21,16 @@ import { swaggerSpec } from "./config/swagger";
 import stocksRoutes from "./modules/stocks/stocks.routes";
 import testimonialsRoutes from "./modules/testimonials/testimonials.routes";
 import orderRoutes from "./modules/order/order.routes";
+import affiliateRoutes from "./modules/affiliates/affiliate.routes";
+import affiliateSalesRoutes from "./modules/affiliates-sales/affiliate-sales.routes";
+import affiliateTrackingRoutes from "./modules/affiliate-tracking/affiliate-tracking.routes";
+import affiliatePixelRoutes from "./modules/affiliate-pixel/affiliate-pixel.routes";
 
 const app: Application = express();
 
 // ── Security ─────────────────────────────────────────────────
 app.use(
   helmet({
-    // Allow Swagger UI to load its assets
     contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
   }),
 );
@@ -34,7 +39,12 @@ app.use(
     origin: env.FRONTEND_URL,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-guest-id"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-guest-id",
+      "x-affiliate-cookie",
+    ],
   }),
 );
 app.use(hpp());
@@ -44,6 +54,10 @@ app.use(generalRateLimiter);
 // ── Body Parsing ──────────────────────────────────────────────
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+// ── Affiliate Tracking ───────────────────────────────────────
+app.use(affiliateTrackingMiddleware);
 
 // ── Logging ───────────────────────────────────────────────────
 app.use(httpLogger);
@@ -54,7 +68,7 @@ if (env.NODE_ENV !== "production") {
     "/api/docs",
     swaggerUi.serve,
     swaggerUi.setup(swaggerSpec, {
-      customSiteTitle: "🌿 NanuHealth API Docs",
+      customSiteTitle: "🌿 Triad-Ecomm API Docs",
       customCss: ".swagger-ui .topbar { background-color: #1a7a4a }",
       swaggerOptions: {
         persistAuthorization: true,
@@ -62,7 +76,6 @@ if (env.NODE_ENV !== "production") {
     }),
   );
 
-  // Raw JSON spec endpoint — useful for importing into Postman
   app.get("/api/docs.json", (_req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.send(swaggerSpec);
@@ -76,6 +89,10 @@ app.use("/api/products", productsRoutes);
 app.use("/api/stocks", stocksRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/affiliates", affiliateRoutes);
+app.use("/api/affiliate-sales", affiliateSalesRoutes);
+app.use("/api/affiliate-tracking", affiliateTrackingRoutes);
+app.use("/api/affiliate-pixel", affiliatePixelRoutes);
 app.use("/api/testimonials", testimonialsRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 

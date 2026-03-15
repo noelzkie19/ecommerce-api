@@ -1,15 +1,16 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { Database } from '../common/types/supabase.types'
-import { env } from './env'
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { env } from "./env";
+
+type SupabaseClientType = SupabaseClient<any>;
 
 // Public client — respects RLS, used for all user-facing auth
-export const supabase: SupabaseClient<Database> = createClient<Database>(
+export const supabase: SupabaseClientType = createClient(
   env.SUPABASE_URL,
-  env.SUPABASE_ANON_KEY
-)
+  env.SUPABASE_ANON_KEY,
+);
 
 // Admin client — service role key, bypasses RLS (server-side only — never expose to frontend)
-export const supabaseAdmin: SupabaseClient<Database> = createClient<Database>(
+export const supabaseAdmin: SupabaseClientType = createClient(
   env.SUPABASE_URL,
-  env.SUPABASE_SERVICE_ROLE_KEY
-)
+  env.SUPABASE_SERVICE_ROLE_KEY,
+);

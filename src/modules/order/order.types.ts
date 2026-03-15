@@ -73,6 +73,5 @@ export interface PaginatedOrders {
 
 export interface PlaceOrderResult {
   order: Order;
-  gcashRedirectUrl: string | null;
-  qrCodeUrl: string | null; // QR PH — show this as a QR code image on the frontend
+  mayaRedirectUrl: string | null; // Maya Wallet deep link - opens Maya app directly
 }

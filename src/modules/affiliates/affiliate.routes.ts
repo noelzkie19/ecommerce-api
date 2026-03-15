@@ -4,7 +4,103 @@ import * as affiliateController from "./affiliate.controller";
 
 const router = Router();
 
-// All affiliate routes are admin-only
+// Public route: PayMongo webhook for affiliate payments
+router.post("/webhook", affiliateController.paymongoWebhook);
+
+// Public route: Verify payment callback (after GCash payment)
+router.get("/payment/verify", affiliateController.verifyAffiliatePayment);
+
+// Protected route: Get current user's affiliate status
+/**
+ * @openapi
+ * /api/affiliates/me:
+ *   get:
+ *     tags: [Affiliates]
+ *     summary: Get current user's affiliate status
+ *     description: Retrieve the authenticated user's affiliate information including store ID, pixel ID, and created date.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user's affiliate status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     status:
+ *                       type: string
+ *                       enum: [pending, active, suspended]
+ *                     paymentStatus:
+ *                       type: string
+ *                       enum: [unpaid, paid]
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     storeId:
+ *                       type: string
+ *                     pixelId:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: No affiliate record found
+ */
+router.get("/me", requireAuth, affiliateController.getMyAffiliateStatus);
+
+// Protected route: Create payment for affiliate registration
+router.post(
+  "/payment/create",
+  requireAuth,
+  affiliateController.createAffiliatePayment,
+);
+
+/**
+ * @openapi
+ * /api/affiliates/me/pixel:
+ *   patch:
+ *     tags: [Affiliates]
+ *     summary: Update current user's pixel ID
+ *     description: Allows an authenticated affiliate to update their own Meta Pixel ID.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - pixelId
+ *             properties:
+ *               pixelId:
+ *                 type: string
+ *                 example: "123412312"
+ *     responses:
+ *       200:
+ *         description: Pixel ID updated successfully
+ *       400:
+ *         description: pixelId is required
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Affiliate not found
+ */
+router.patch("/me/pixel", requireAuth, affiliateController.updateMyPixelId);
+
+// All other affiliate routes are admin-only
 router.use(requireAuth, requireAdmin);
 
 // ── Affiliate collection ──────────────────────────────────────────────────────
@@ -73,6 +169,14 @@ router.get("/", affiliateController.getAffiliates);
  *                 type: string
  *                 format: email
  *                 example: jane@example.com
+ *               pixelId:
+ *                 type: string
+ *                 description: Meta Pixel ID for tracking
+ *                 example: 1234567890
+ *               storeId:
+ *                 type: string
+ *                 description: Store ID for affiliate
+ *                 example: store_abc123
  *     responses:
  *       201:
  *         description: Affiliate created
@@ -135,6 +239,12 @@ router.get("/:id", affiliateController.getAffiliate);
  *               status:
  *                 type: string
  *                 enum: [active, suspended]
+ *               pixelId:
+ *                 type: string
+ *                 description: Meta Pixel ID for tracking
+ *               storeId:
+ *                 type: string
+ *                 description: Store ID for affiliate
  *     responses:
  *       200:
  *         description: Affiliate updated
