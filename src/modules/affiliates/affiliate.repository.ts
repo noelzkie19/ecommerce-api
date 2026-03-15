@@ -343,3 +343,97 @@ export const findByUserId = async (userId: string) => {
     paymentStatus: data.payment_status ?? "unpaid",
   };
 };
+
+// ── Affiliate Settings ───────────────────────────────────────────────────────────
+
+/**
+ * Get all affiliate settings
+ */
+export const getSettings = async () => {
+  const { data, error } = await db.from("affiliate_settings").select("*");
+
+  if (error) throw new AppError("Failed to fetch settings", 500);
+
+  // Convert to key-value object
+  const settings: Record<string, string> = {};
+  data?.forEach((row: any) => {
+    settings[row.key] = row.value;
+  });
+
+  return {
+    registrationFee: Number.parseFloat(settings.registration_fee ?? "999"),
+    referralCommissionRate: Number.parseFloat(
+      settings.referral_commission_rate ?? "20",
+    ),
+    referralCommissionType:
+      (settings.referral_commission_type as "percentage" | "fixed") ??
+      "percentage",
+  };
+};
+
+/**
+ * Update affiliate settings
+ */
+export const updateSettings = async (
+  registrationFee?: number,
+  referralCommissionRate?: number,
+  referralCommissionType?: "percentage" | "fixed",
+) => {
+  const updates: Record<string, string> = {};
+
+  if (registrationFee !== undefined) {
+    updates.registration_fee = registrationFee.toString();
+  }
+  if (referralCommissionRate !== undefined) {
+    updates.referral_commission_rate = referralCommissionRate.toString();
+  }
+  if (referralCommissionType !== undefined) {
+    updates.referral_commission_type = referralCommissionType;
+  }
+
+  for (const [key, value] of Object.entries(updates)) {
+    const { error } = await db
+      .from("affiliate_settings")
+      .upsert(
+        { key, value, updated_at: new Date().toISOString() },
+        { onConflict: "key" },
+      );
+
+    if (error) {
+      console.error(`Failed to update setting ${key}:`, error);
+    }
+  }
+
+  return getSettings();
+};
+
+/**
+ * Get affiliate by affiliate_link
+ */
+export const findByAffiliateLink = async (link: string) => {
+  const { data, error } = await db
+    .from("affiliates")
+    .select("id, name, email, status, pixel_id, store_id, affiliate_link")
+    .eq("affiliate_link", link)
+    .single();
+
+  if (error) return null;
+  return data;
+};
+
+/**
+ * Update affiliate's referred_by field
+ */
+export const updateReferredBy = async (
+  affiliateId: string,
+  referredById: string,
+) => {
+  const { error } = await db
+    .from("affiliates")
+    .update({ referred_by: referredById, updated_at: new Date().toISOString() })
+    .eq("id", affiliateId);
+
+  if (error) {
+    console.error("Failed to update referred_by:", error);
+  }
+};

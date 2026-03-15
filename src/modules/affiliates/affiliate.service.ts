@@ -131,7 +131,7 @@ export const createAffiliatePayment = async (
     intent.clientKey,
     email,
     fullName,
-    `${appUrl}/affiliate/payment/callback?intent_id=${intent.intentId}&user_id=${userId}`,
+    `${appUrl}/api/affiliates/payment/verify?intentId=${intent.intentId}&userId=${userId}`,
   );
 
   return {
@@ -142,6 +142,64 @@ export const createAffiliatePayment = async (
 };
 
 // ── Verify Affiliate Registration Payment ───────────────────────────────────
+
+/**
+ * Helper to record referral commission if the affiliate was referred
+ */
+async function recordReferralCommissionIfNeeded(
+  affiliate: { id: string; referred_by: string | null },
+  registrationFee: number,
+): Promise<void> {
+  if (!affiliate?.referred_by) {
+    return;
+  }
+
+  try {
+    const commissionResult = await recordReferralCommission(
+      affiliate.id,
+      registrationFee,
+    );
+    if (commissionResult) {
+      console.log("[Referral Commission] Recorded:", commissionResult);
+    }
+  } catch (error) {
+    console.error("[Referral Commission] Failed to record:", error);
+  }
+}
+
+/**
+ * Helper to fire Meta Pixel Lead event for affiliate registration
+ */
+async function fireAffiliateRegistrationPixel(
+  userId: string,
+  registrationFee: number,
+  pixelId: string,
+  email: string,
+  name: string,
+  storeId: string | undefined,
+): Promise<void> {
+  try {
+    const { buildLeadEvent } =
+      await import("../affiliate-pixel/affiliate-pixel.utils");
+    const { sendPixelEvent } =
+      await import("../affiliate-pixel/affiliate-pixel.service");
+
+    const event = buildLeadEvent({
+      leadId: userId,
+      value: registrationFee,
+      currency: "PHP",
+      customerEmail: email,
+      customerFirstName: name,
+      pixelId: pixelId,
+      storeId: storeId,
+      leadType: "affiliate_registration",
+    });
+
+    await sendPixelEvent(event, pixelId);
+  } catch (error) {
+    console.error("Failed to fire Meta Pixel Lead event:", error);
+  }
+}
 
 export const verifyAffiliatePayment = async (
   intentId: string,
@@ -170,36 +228,23 @@ export const verifyAffiliatePayment = async (
     // 2. Activate the affiliate (same as order flow)
     await affiliateRepository.activateByUserId(userId);
 
-    // 3. Fire Meta Pixel Lead event for affiliate registration
-    // Get the updated affiliate to get the pixel_id
-    const updatedAffiliate = await affiliateRepository.findByUserId(userId);
-    if (updatedAffiliate?.pixel_id) {
-      try {
-        const registrationFee = Number.parseFloat(
-          process.env.AFFILIATE_REGISTRATION_FEE || "100",
-        );
-        // Import dynamically to avoid circular dependencies
-        const { buildLeadEvent } =
-          await import("../affiliate-pixel/affiliate-pixel.utils");
-        const { sendPixelEvent } =
-          await import("../affiliate-pixel/affiliate-pixel.service");
+    // 3. Get settings for registration fee and record referral commission
+    const settings = await affiliateRepository.getSettings();
+    const registrationFee = settings.registrationFee;
 
-        const event = buildLeadEvent({
-          leadId: userId,
-          value: registrationFee,
-          currency: "PHP",
-          customerEmail: updatedAffiliate.email,
-          customerFirstName: updatedAffiliate.name,
-          pixelId: updatedAffiliate.pixel_id,
-          storeId: updatedAffiliate.store_id,
-          leadType: "affiliate_registration",
-        });
+    // 4. Record referral commission if this affiliate was referred
+    await recordReferralCommissionIfNeeded(affiliate, registrationFee);
 
-        await sendPixelEvent(event, updatedAffiliate.pixel_id);
-      } catch (error) {
-        console.error("Failed to fire Meta Pixel Lead event:", error);
-        // Don't fail the payment if pixel event fails
-      }
+    // 5. Fire Meta Pixel Lead event for affiliate registration
+    if (affiliate.pixel_id) {
+      await fireAffiliateRegistrationPixel(
+        userId,
+        registrationFee,
+        affiliate.pixel_id,
+        affiliate.email,
+        affiliate.name,
+        affiliate.store_id ?? undefined,
+      );
     }
 
     return { success: true, status, alreadyConfirmed: false };
@@ -208,4 +253,111 @@ export const verifyAffiliatePayment = async (
   }
 
   return { success: false, status };
+};
+
+// ── Affiliate Settings (Admin) ─────────────────────────────────────────────────
+
+export const getAffiliateSettings = () => affiliateRepository.getSettings();
+
+export const updateAffiliateSettings = async (
+  registrationFee?: number,
+  referralCommissionRate?: number,
+  referralCommissionType?: "percentage" | "fixed",
+) =>
+  affiliateRepository.updateSettings(
+    registrationFee,
+    referralCommissionRate,
+    referralCommissionType,
+  );
+
+// ── Affiliate Link ───────────────────────────────────────────────────────────
+
+/**
+ * Get affiliate's referral link
+ */
+export const getMyAffiliateLink = async (userId: string) => {
+  const affiliate = await affiliateRepository.findByUserId(userId);
+  if (!affiliate) {
+    throw new AppError("Affiliate not found", 404);
+  }
+
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const affiliateLink = `${frontendUrl}/register?ref=${affiliate.affiliateLink}`;
+
+  return {
+    affiliateLink,
+    affiliateLinkCode: affiliate.affiliateLink,
+  };
+};
+
+// ── Commission Calculation for Referrals ───────────────────────────────────────
+
+/**
+ * Record commission for referring a new affiliate
+ * Called when a referred affiliate completes payment
+ */
+export const recordReferralCommission = async (
+  referredAffiliateId: string,
+  paymentAmount: number,
+) => {
+  // Get the referred affiliate
+  const referredAffiliate =
+    await affiliateRepository.findById(referredAffiliateId);
+  if (!referredAffiliate?.referredBy) {
+    return null; // No referrer
+  }
+
+  // Get commission settings
+  const settings = await affiliateRepository.getSettings();
+  const { referralCommissionRate, referralCommissionType } = settings;
+
+  // Calculate commission
+  let commissionAmount = 0;
+  if (referralCommissionType === "percentage") {
+    commissionAmount = (paymentAmount * referralCommissionRate) / 100;
+  } else {
+    commissionAmount = referralCommissionRate;
+  }
+
+  if (commissionAmount <= 0) {
+    return null;
+  }
+
+  // Record the commission sale for the referrer
+  const { error } = await (
+    await import("../../config/supabase")
+  ).supabaseAdmin
+    .from("affiliate_sales")
+    .insert({
+      affiliate_id: referredAffiliate.referredBy,
+      referred_affiliate_id: referredAffiliateId,
+      order_id: null, // No order, this is a registration
+      sale_amount: paymentAmount,
+      commission_earned: commissionAmount,
+      status: "approved", // Auto-approve for registration commissions
+      type: "referral",
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to record referral commission:", error);
+    return null;
+  }
+
+  // Update referrer's totals
+  await affiliateRepository.updateTotals(
+    referredAffiliate.referredBy,
+    paymentAmount,
+    commissionAmount,
+  );
+
+  return {
+    referredAffiliateId,
+    referrerId: referredAffiliate.referredBy,
+    paymentAmount,
+    commissionRate: referralCommissionRate,
+    commissionType: referralCommissionType,
+    commissionAmount,
+  };
 };

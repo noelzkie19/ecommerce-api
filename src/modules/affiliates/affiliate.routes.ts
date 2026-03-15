@@ -100,6 +100,25 @@ router.post(
  */
 router.patch("/me/pixel", requireAuth, affiliateController.updateMyPixelId);
 
+// ── Affiliate Link (User) ─────────────────────────────────────────────────────
+
+/**
+ * @openapi
+ * /api/affiliates/me/link:
+ *   get:
+ *     tags: [Affiliates]
+ *     summary: Get current user's affiliate referral link
+ *     description: Retrieve the authenticated user's unique affiliate referral link.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Affiliate link retrieved
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/me/link", requireAuth, affiliateController.getMyAffiliateLink);
+
 // All other affiliate routes are admin-only
 router.use(requireAuth, requireAdmin);
 
@@ -410,5 +429,73 @@ router.post("/:id/products", affiliateController.assignProduct);
  *         description: Product removed
  */
 router.delete("/:id/products/:productId", affiliateController.removeProduct);
+
+// ── Affiliate Settings (Admin) ─────────────────────────────────────────────────
+
+/**
+ * @openapi
+ * /api/affiliates/settings:
+ *   get:
+ *     tags: [Affiliates]
+ *     summary: Get affiliate settings (Admin)
+ *     description: Retrieve commission rates and registration fee settings.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Settings retrieved
+ */
+router.get("/settings", affiliateController.getAffiliateSettings);
+
+/**
+ * @openapi
+ * /api/affiliates/settings:
+ *   patch:
+ *     tags: [Affiliates]
+ *     summary: Update affiliate settings (Admin)
+ *     description: Update commission rates and registration fee.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               registrationFee:
+ *                 type: number
+ *                 example: 999
+ *               referralCommissionRate:
+ *                 type: number
+ *                 example: 20
+ *               referralCommissionType:
+ *                 type: string
+ *                 enum: [percentage, fixed]
+ *                 example: percentage
+ *     responses:
+ *       200:
+ *         description: Settings updated
+ */
+router.patch("/settings", affiliateController.updateAffiliateSettings);
+
+// ── Affiliate Link (User) ─────────────────────────────────────────────────────
+
+/**
+ * @openapi
+ * /api/affiliates/me/link:
+ *   get:
+ *     tags: [Affiliates]
+ *     summary: Get current user's affiliate referral link
+ *     description: Retrieve the authenticated user's unique affiliate referral link.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Affiliate link retrieved
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/me/link", affiliateController.getMyAffiliateLink);
 
 export default router;

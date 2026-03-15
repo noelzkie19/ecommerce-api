@@ -14,7 +14,7 @@ const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
   FRONTEND_URL: z.string().url(),
-  AFFILIATE_REGISTRATION_FEE: z.string().default("100"),
+  AFFILIATE_REGISTRATION_FEE: z.string().default("999"),
 });
 
 const parsed = envSchema.safeParse(process.env);

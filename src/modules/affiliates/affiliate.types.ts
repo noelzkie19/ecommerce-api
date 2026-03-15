@@ -13,6 +13,8 @@ export interface Affiliate {
   paymentStatus: PaymentStatus; // ← whether affiliate has paid
   pixelId?: string; // ← Meta Pixel ID for tracking
   storeId?: string; // ← Store ID for affiliate
+  affiliateLink?: string; // ← Unique referral link code
+  referredBy?: string; // ← ID of affiliate who referred this user
   createdAt: string;
   updatedAt: string;
   /** Derived / joined fields returned by the repository */
@@ -76,4 +78,18 @@ export interface PaginationMeta {
 export interface PaginatedAffiliates {
   data: Affiliate[];
   meta: PaginationMeta;
+}
+
+// ── Affiliate Settings ───────────────────────────────────────────────────────────
+
+export interface AffiliateSettings {
+  registrationFee: number;
+  referralCommissionRate: number;
+  referralCommissionType: "percentage" | "fixed";
+}
+
+export interface UpdateSettingsDTO {
+  registrationFee?: number;
+  referralCommissionRate?: number;
+  referralCommissionType?: "percentage" | "fixed";
 }
