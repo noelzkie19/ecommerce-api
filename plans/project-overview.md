@@ -92,7 +92,8 @@ src/
 │   │   ├── affiliate-tracking.controller.ts
 │   │   ├── affiliate-tracking.routes.ts
 │   │   ├── affiliate-tracking.service.ts
-│   │   └── affiliate-tracking.repository.ts
+│   │   ├── affiliate-tracking.repository.ts
+│   │   └── affiliate-tracking.types.ts
 │   │
 │   └── affiliate-pixel/   # Meta Pixel events
 │       ├── affiliate-pixel.controller.ts
@@ -152,20 +153,42 @@ src/
 
 ### Affiliates (`/api/affiliates`)
 
-| Endpoint                    | Method | Description                     |
-| --------------------------- | ------ | ------------------------------- |
-| `/`                         | GET    | Get my affiliate info           |
-| `/`                         | POST   | Register as affiliate           |
-| `/payment/create`           | POST   | Create payment for registration |
-| `/payment/verify/:intentId` | GET    | Verify payment                  |
-| `/admin/all`                | GET    | All affiliates (admin)          |
+| Endpoint                   | Method | Description                     |
+| -------------------------- | ------ | ------------------------------- |
+| `/`                        | GET    | Get all affiliates (admin)      |
+| `/`                        | POST   | Create affiliate (admin)        |
+| `/me`                      | GET    | Get my affiliate info           |
+| `/me/link`                 | GET    | Get my affiliate link           |
+| `/me/pixel`                | PATCH  | Update my pixel ID              |
+| `/payment/create`          | POST   | Create payment for registration |
+| `/payment/verify`          | GET    | Verify payment                  |
+| `/webhook`                 | POST   | PayMongo webhook                |
+| `/settings`                | GET    | Get affiliate settings (admin)  |
+| `/settings`                | PATCH  | Update settings (admin)         |
+| `/:id`                     | GET    | Get affiliate by ID             |
+| `/:id`                     | PATCH  | Update affiliate                |
+| `/:id`                     | DELETE | Delete affiliate                |
+| `/:id/suspend`             | PATCH  | Suspend affiliate               |
+| `/:id/activate`            | PATCH  | Activate affiliate              |
+| `/:id/products`            | GET    | Get affiliate products          |
+| `/:id/products`            | POST   | Assign product to affiliate     |
+| `/:id/products/:productId` | DELETE | Remove product from affiliate   |
 
 ### Affiliate Tracking (`/api/affiliate-tracking`)
 
-| Endpoint | Method | Description             |
-| -------- | ------ | ----------------------- |
-| `/track` | POST   | Track click/attribution |
-| `/stats` | GET    | Get tracking stats      |
+| Endpoint                                 | Method | Description                  |
+| ---------------------------------------- | ------ | ---------------------------- |
+| `/resolve`                               | GET    | Resolve ref to affiliate     |
+| `/affiliates/:id/tracking-links`         | POST   | Create tracking link         |
+| `/affiliates/:id/tracking-links`         | GET    | List tracking links          |
+| `/affiliates/:id/tracking-links/:linkId` | GET    | Get tracking link details    |
+| `/affiliates/:id/tracking-links/:linkId` | PATCH  | Update tracking link         |
+| `/affiliates/:id/tracking-links/:linkId` | DELETE | Delete tracking link         |
+| `/attributions/orders/:orderId`          | GET    | Get order attribution        |
+| `/attributions/orders/:orderId`          | POST   | Attribute order to affiliate |
+| `/affiliates/:id/attributions`           | GET    | Get affiliate attributions   |
+| `/affiliates/:id/tracking-stats`         | GET    | Get tracking statistics      |
+| `/tracking/cookie-config`                | GET    | Get cookie configuration     |
 
 ### Affiliate Pixel (`/api/affiliate-pixel`)
 

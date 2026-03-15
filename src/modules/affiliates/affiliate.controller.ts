@@ -149,6 +149,10 @@ export const getMyAffiliateStatus = catchAsync(
       name: affiliate.name,
       storeId: buildStoreUrl(affiliate.store_id),
       pixelId: affiliate.pixel_id,
+      affiliateLink: affiliate.affiliateLink
+        ? `${process.env.FRONTEND_URL || "http://localhost:5173"}/register?ref=${affiliate.affiliateLink}`
+        : null,
+      affiliateLinkCode: affiliate.affiliateLink,
       createdAt: affiliate.created_at,
     });
   },
@@ -272,5 +276,42 @@ export const paymongoWebhook = catchAsync(
 
     // Always return 200 so PayMongo doesn't retry
     sendSuccess(res, null, "Webhook received");
+  },
+);
+
+// ── Affiliate Settings (Admin) ─────────────────────────────────────────────────
+
+export const getAffiliateSettings = catchAsync(
+  async (_req: Request, res: Response): Promise<void> => {
+    const settings = await affiliateService.getAffiliateSettings();
+    sendSuccess(res, settings);
+  },
+);
+
+export const updateAffiliateSettings = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const { registrationFee, referralCommissionRate, referralCommissionType } =
+      req.body;
+
+    const settings = await affiliateService.updateAffiliateSettings(
+      registrationFee,
+      referralCommissionRate,
+      referralCommissionType,
+    );
+    sendSuccess(res, settings, "Settings updated successfully");
+  },
+);
+
+// ── Affiliate Link ───────────────────────────────────────────────────────────
+
+export const getMyAffiliateLink = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      throw new AppError("Unauthorized", 401);
+    }
+
+    const result = await affiliateService.getMyAffiliateLink(userId);
+    sendSuccess(res, result);
   },
 );
