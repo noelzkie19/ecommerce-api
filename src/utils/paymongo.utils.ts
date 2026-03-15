@@ -68,7 +68,7 @@ export const createPaymentIntent = async (
         attributes: {
           amount: Math.round(amountInPesos * 100), // centavos
           currency: "PHP",
-          payment_method_allowed: ["maya"],
+          payment_method_allowed: ["paymaya"],
           capture_type: "automatic",
           ...(metadata && { metadata }),
         },
@@ -90,10 +90,10 @@ export const createPaymentIntent = async (
   };
 };
 
-// ── 2. Create Maya Wallet Payment Method + Attach ────────────────────────
+// ── 2. Create PayMaya Payment Method + Attach ─────────────────────────
 
 /**
- * Attaches Maya Wallet payment method to a payment intent.
+ * Attaches PayMaya payment method to a payment intent.
  * Returns a redirect URL that opens the Maya Wallet app via deep link.
  */
 export const attachMayaToIntent = async (
@@ -103,7 +103,7 @@ export const attachMayaToIntent = async (
   name: string,
   returnUrl: string,
 ) => {
-  // Step A — create payment method (type: "maya" for Maya Wallet deep link)
+  // Step A — create payment method (type: "paymaya" for Maya Wallet deep link)
   const methodRes = await fetch(`${PAYMONGO_BASE}/payment_methods`, {
     method: "POST",
     headers: {
@@ -113,7 +113,7 @@ export const attachMayaToIntent = async (
     body: JSON.stringify({
       data: {
         attributes: {
-          type: "maya",
+          type: "paymaya",
           billing: { name, email },
         },
       },
@@ -165,7 +165,7 @@ export const attachMayaToIntent = async (
 
   return {
     status: attachData.data.attributes.status,
-    // maya: next_action.redirect.url (deep link to open Maya Wallet app)
+    // paymaya: next_action.redirect.url (deep link to open Maya Wallet app)
     redirectUrl: nextAction?.redirect?.url ?? null,
   };
 };

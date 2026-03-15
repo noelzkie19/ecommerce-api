@@ -2,59 +2,41 @@
 
 ## 1. Project Summary
 
-**Triad-Ecomm** is a full-featured e-commerce backend API built with:
-
-- **Runtime**: Node.js with Express
-- **Language**: TypeScript
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth + Google OAuth
-- **Payment Processing**: PayMongo (Maya Wallet, GCash, Card, COD)
-
----
-
-## 2. Architecture
+**Triad-Ecomm** is a full-featured e-commerce backend API with affiliate marketing capabilities.
 
 ### Tech Stack
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Frontend (React/Next.js)                │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  Express.js API Server                      │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐  │
-│  │ Middlewares │ │  Controllers│ │    Services         │  │
-│  └─────────────┘ └─────────────┘ └─────────────────────┘  │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐  │
-│  │ Validators  │ │ Repositories│ │    Utilities        │  │
-│  └─────────────┘ └─────────────┘ └─────────────────────┘  │
-└─────────────────────────────┬───────────────────────────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-       ┌──────────┐   ┌───────────┐   ┌────────────┐
-       │ Supabase │   │ PayMongo  │   │  Webhooks  │
-       │ Database │   │ Payments  │   │            │
-       └──────────┘   └───────────┘   └────────────┘
-```
+| Layer          | Technology                               |
+| -------------- | ---------------------------------------- |
+| Runtime        | Node.js                                  |
+| Framework      | Express.js                               |
+| Language       | TypeScript                               |
+| Database       | Supabase (PostgreSQL)                    |
+| Authentication | Supabase Auth + Google OAuth             |
+| Payments       | PayMongo (Maya Wallet, GCash, Card, COD) |
+| Analytics      | Meta Pixel Events                        |
 
 ---
 
-## 3. Project Structure
+## 2. Project Structure
 
 ```
 src/
-├── app.ts                 # Express app setup & routes
+├── app.ts                 # Express app setup & route registration
 ├── server.ts              # Server entry point
 │
 ├── common/
 │   ├── constants/         # App constants (roles, etc.)
 │   ├── middlewares/       # Express middlewares
-│   ├── resolvers/         # Owner resolution (auth/guest)
+│   │   ├── affiliateTracking.ts   # Tracks affiliate referrals
+│   │   ├── errorHandler.ts         # Global error handling
+│   │   ├── logger.ts               # HTTP logging
+│   │   ├── rateLimiter.ts          # Rate limiting
+│   │   └── sanitize.ts             # Input sanitization
+│   ├── resolvers/
+│   │   └── owner.resolver.ts       # Auth/Guest resolution
 │   ├── types/             # TypeScript declarations
-│   ├── utils/             # Utility functions
+│   ├── utils/             # AppError, catchAsync, response
 │   └── validators/        # Zod validation schemas
 │
 ├── config/
@@ -63,159 +45,394 @@ src/
 │   └── swagger.ts         # OpenAPI spec
 │
 ├── modules/               # Feature modules
-│   ├── auth/              # Authentication (login, register, Google OAuth)
+│   ├── auth/              # Authentication
+│   │   ├── auth.controller.ts
+│   │   ├── auth.routes.ts
+│   │   ├── auth.service.ts
+│   │   ├── auth.middleware.ts
+│   │   └── auth.validation.ts
+│   │
 │   ├── users/             # User management
+│   │
 │   ├── products/          # Product catalog
+│   │   ├── products.controller.ts
+│   │   ├── products.routes.ts
+│   │   ├── products.service.ts
+│   │   ├── products.repository.ts
+│   │   └── products.admin.controller.ts
+│   │
 │   ├── cart/              # Shopping cart
-│   ├── order/             # Orders & payments (PayMongo)
+│   │   ├── cart.controller.ts
+│   │   ├── cart.routes.ts
+│   │   ├── cart.service.ts
+│   │   └── cart.repository.ts
+│   │
+│   ├── order/             # Orders & payments
+│   │   ├── order.controller.ts
+│   │   ├── order.routes.ts
+│   │   ├── order.service.ts      # Payment processing
+│   │   └── order.repository.ts
+│   │
 │   ├── stocks/            # Inventory management
+│   │
 │   ├── wishlist/          # User wishlists
+│   │
 │   ├── testimonials/      # Product reviews
+│   │
 │   ├── affiliates/        # Affiliate program
+│   │   ├── affiliate.controller.ts
+│   │   ├── affiliate.routes.ts
+│   │   ├── affiliate.service.ts  # Payment & activation
+│   │   ├── affiliate.repository.ts
+│   │   └── affiliate.types.ts
+│   │
 │   ├── affiliates-sales/  # Affiliate commissions
-│   ├── affiliate-tracking/ # Tracking clicks & attribution
-│   └── affiliate-pixel/  # Meta Pixel events
+│   │
+│   ├── affiliate-tracking/ # Click attribution
+│   │   ├── affiliate-tracking.controller.ts
+│   │   ├── affiliate-tracking.routes.ts
+│   │   ├── affiliate-tracking.service.ts
+│   │   └── affiliate-tracking.repository.ts
+│   │
+│   └── affiliate-pixel/   # Meta Pixel events
+│       ├── affiliate-pixel.controller.ts
+│       ├── affiliate-pixel.routes.ts
+│       ├── affiliate-pixel.service.ts
+│       ├── affiliate-pixel.repository.ts
+│       └── affiliate-pixel.utils.ts
 │
 └── utils/
-    ├── paymongo.utils.ts  # Payment processing
-    └── (other utilities)
+    └── paymongo.utils.ts  # Payment processing (Maya Wallet)
 ```
 
 ---
 
-## 4. API Modules
+## 3. API Modules
 
 ### Authentication (`/api/auth`)
 
-- Email/password registration & login
-- Google OAuth integration
-- JWT token management
-- Guest checkout support
+| Endpoint           | Method | Description                 |
+| ------------------ | ------ | --------------------------- |
+| `/register`        | POST   | Email/password registration |
+| `/login`           | POST   | Email/password login        |
+| `/google`          | GET    | Google OAuth redirect       |
+| `/google/callback` | GET    | Google OAuth callback       |
+| `/me`              | GET    | Get current user            |
 
 ### Products (`/api/products`)
 
-- Product CRUD operations
-- Image uploads
-- Category management
-- Stock tracking
+| Endpoint | Method | Description                     |
+| -------- | ------ | ------------------------------- |
+| `/`      | GET    | List products (with pagination) |
+| `/`      | POST   | Create product (admin)          |
+| `/:id`   | GET    | Get product details             |
+| `/:id`   | PUT    | Update product (admin)          |
+| `/:id`   | DELETE | Delete product (admin)          |
 
 ### Cart (`/api/cart`)
 
-- Add/remove items
-- Update quantities
-- Guest cart support (via `x-guest-id` header)
+| Endpoint   | Method | Description           |
+| ---------- | ------ | --------------------- |
+| `/`        | GET    | Get cart items        |
+| `/`        | POST   | Add item to cart      |
+| `/:itemId` | PUT    | Update item quantity  |
+| `/:itemId` | DELETE | Remove item from cart |
 
 ### Orders (`/api/orders`)
 
-- Place order (COD, GCash/Maya, Card)
-- Payment verification
-- Order status tracking
-- PayMongo webhook handling
+| Endpoint                  | Method | Description           |
+| ------------------------- | ------ | --------------------- |
+| `/`                       | POST   | Place order           |
+| `/`                       | GET    | Get user orders       |
+| `/:id`                    | GET    | Get order details     |
+| `/verify-gcash/:intentId` | GET    | Verify payment        |
+| `/webhook/paymongo`       | POST   | PayMongo webhook      |
+| `/admin/all`              | GET    | All orders (admin)    |
+| `/admin/:id/status`       | PATCH  | Update status (admin) |
 
 ### Affiliates (`/api/affiliates`)
 
-- Affiliate registration
-- Payment tracking
-- Commission management
+| Endpoint                    | Method | Description                     |
+| --------------------------- | ------ | ------------------------------- |
+| `/`                         | GET    | Get my affiliate info           |
+| `/`                         | POST   | Register as affiliate           |
+| `/payment/create`           | POST   | Create payment for registration |
+| `/payment/verify/:intentId` | GET    | Verify payment                  |
+| `/admin/all`                | GET    | All affiliates (admin)          |
 
 ### Affiliate Tracking (`/api/affiliate-tracking`)
 
-- Click attribution (URL params, cookies)
-- Pixel store IDs
-- Conversion tracking
+| Endpoint | Method | Description             |
+| -------- | ------ | ----------------------- |
+| `/track` | POST   | Track click/attribution |
+| `/stats` | GET    | Get tracking stats      |
 
 ### Affiliate Pixel (`/api/affiliate-pixel`)
 
-- Meta Pixel event firing
-- Purchase event tracking
-- Store-specific pixel IDs
+| Endpoint | Method | Description         |
+| -------- | ------ | ------------------- |
+| `/`      | GET    | List pixel configs  |
+| `/`      | POST   | Create pixel config |
+| `/fire`  | POST   | Fire pixel event    |
 
 ---
 
-## 5. Payment Flow (PayMongo)
+## 4. End-to-End Process Flows
 
-### Current Implementation: Maya Wallet Deep Link
+### 4.1 Customer Purchase Flow
+
+```mermaid
+sequenceDiagram
+    participant Customer
+    participant Frontend
+    participant API
+    participant Supabase
+    participant PayMongo
+    participant Maya
+
+    Customer->>Frontend: Browse products
+    Frontend->>API: GET /api/products
+    API->>Supabase: Query products
+    Supabase-->>API: Products list
+    API-->>Frontend: Products
+
+    Customer->>Frontend: Add to cart
+    Frontend->>API: POST /api/cart
+    API->>Supabase: Save cart
+    Supabase-->>API: Success
+
+    Customer->>Frontend: Checkout (select payment)
+    Frontend->>API: POST /api/orders
+    API->>PayMongo: Create intent (paymaya)
+    PayMongo-->>API: Intent + redirect URL
+    API-->>Frontend: { order, redirectUrl }
+
+    Frontend->>Customer: Display payment link
+    Customer->>Maya: Click link → Opens Maya Wallet
+    Customer->>Maya: Complete payment
+    Maya-->>Frontend: Redirect to callback
+    Maya->>API: Webhook - payment success
+
+    API->>Supabase: Verify & confirm order
+    API->>Supabase: Deduct stock
+    API->>Supabase: Record affiliate sale (if referred)
+    API-->>Frontend: Order confirmed
+```
+
+### 4.2 Affiliate Registration Flow
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Frontend
     participant API
+    participant Supabase
     participant PayMongo
-    participant MayaApp
+    participant Maya
 
-    User->>Frontend: Select payment method
-    Frontend->>API: POST /api/orders
-    API->>PayMongo: Create payment intent (maya)
-    PayMongo-->>API: intent + client_key
-    API->>PayMongo: Attach maya payment method
-    PayMongo-->>API: redirect_url (deep link)
-    API-->>Frontend: { order, mayaRedirectUrl }
-    Frontend-->>User: Display "Pay with Maya" button
-    User->>Frontend: Click payment link
-    Frontend->>MayaApp: Open deep link
-    MayaApp-->>User: Payment form
-    User->>MayaApp: Complete payment
-    MayaApp->>Frontend: Redirect to callback
-    PayMongo->>API: Webhook (payment success)
-    API->>API: Verify & confirm order
-    API->>API: Deduct stock, record affiliate sales
+    User->>Frontend: Click "Become Affiliate"
+    Frontend->>API: POST /api/affiliates
+    API->>Supabase: Create affiliate (pending)
+    Supabase-->>API: Created
+    API-->>Frontend: Registration required
+
+    Frontend->>API: POST /api/affiliates/payment/create
+    API->>PayMongo: Create payment intent (paymaya)
+    PayMongo-->>API: Intent + redirect URL
+    API-->>Frontend: { redirectUrl }
+
+    Frontend->>User: Display payment link
+    User->>Maya: Click → Opens Maya Wallet
+    User->>Maya: Pay registration fee (₱100)
+    Maya-->>API: Webhook - payment success
+
+    API->>Supabase: Verify payment (status = succeeded)
+    API->>Supabase: Mark as paid
+    API->>Supabase: Activate affiliate (auto-approve)
+    API-->>Frontend: Registration complete!
+
+    Note over API: Affiliate now active and can earn commissions
 ```
 
-### Payment Methods
+### 4.3 Affiliate Referral Flow
 
-| Method | Implementation | Description                              |
-| ------ | -------------- | ---------------------------------------- |
-| COD    | Direct         | Cash on delivery - no payment processing |
-| gcash  | Maya Wallet    | Deep link to Maya Wallet app             |
-| card   | PayMongo       | Credit/debit card via PayMongo           |
+```mermaid
+sequenceDiagram
+    participant Visitor
+    participant Affiliate
+    participant Frontend
+    participant API
+    participant Supabase
+
+    Affiliate->>Visitor: Share link (example.com?ref=ABC123)
+
+    Visitor->>Frontend: Visit with ref param
+    Frontend->>API: GET /products (with x-affiliate-cookie)
+
+    Note over API: Middleware extracts ref/cookie
+
+    API->>Supabase: Track click (affiliate_id, store_id)
+    Supabase-->>API: Click recorded
+    API-->>Frontend: Products
+
+    Visitor->>Frontend: Purchase product
+    Frontend->>API: POST /api/orders
+
+    Note over API: Order tagged with affiliate_id
+
+    API->>Supabase: Create order (with affiliate_id)
+    API->>Supabase: Record affiliate_sale (commission)
+    API->>Supabase: Deduct stock
+    Supabase-->>API: Order created
+
+    API->>API: Fire Meta Pixel Purchase event
+    API-->>Frontend: Order confirmed
+
+    Note over Affiliate: Earns commission on sale!
+```
+
+---
+
+## 5. Payment Processing (PayMongo)
+
+### Supported Payment Methods
+
+| Method  | Type      | Description           |
+| ------- | --------- | --------------------- |
+| `cod`   | Direct    | Cash on delivery      |
+| `gcash` | Deep Link | Maya Wallet (PayMaya) |
+| `card`  | Redirect  | Credit/Debit card     |
+
+### PayMaya Implementation Details
+
+The API uses **PayMaya** (not Maya) as the payment method identifier:
+
+```typescript
+// In paymongo.utils.ts
+const paymentIntent = {
+  payment_method_allowed: ["paymaya"], // PayMaya identifier
+};
+
+// When attaching payment method
+const paymentMethod = {
+  type: "paymaya", // Creates deep link to Maya Wallet
+};
+```
+
+### Payment Flow
+
+1. **Create Payment Intent** → API calls PayMongo to create intent
+2. **Attach Payment Method** → Creates PayMaya payment method
+3. **Get Redirect URL** → PayMongo returns deep link
+4. **User Pays** → Opens Maya Wallet, completes payment
+5. **Verify** → Webhook or callback verifies payment
+6. **Confirm** → Order confirmed, stock deducted, affiliate credited
 
 ---
 
 ## 6. Affiliate System
 
-### Tracking Flow
+### Affiliate Status Flow
 
-1. **Click Attribution**: Affiliate shares link with `?ref=AFFILIATE_ID`
-2. **Cookie Tracking**: `x-affiliate-cookie` header tracks referred users
-3. **Order Attribution**: Orders tagged with affiliate ID
-4. **Pixel Events**: Meta Pixel fires on purchase
+```
+[New User]
+    ↓ (registers)
+[Pending] - Needs to pay registration fee
+    ↓ (pays ₱100)
+[Paid] - Payment verified
+    ↓ (auto-activated)
+[Active] - Can earn commissions
+    ↓ (makes sale)
+[Commission] - Earns from referrals
+```
 
-### Key Features
+### Auto-Approval
 
-- Auto-create affiliate on first purchase
-- Registration fee payment (via PayMongo)
-- Commission tracking per sale
-- Pixel event integration for Meta Ads
+After successful payment:
+
+```typescript
+// In affiliate.service.ts - verifyAffiliatePayment()
+if (status === "succeeded") {
+  await markAsPaidByUserId(userId); // Mark paid
+  await activateByUserId(userId); // Auto-approve!
+}
+```
+
+### Commission Tracking
+
+- Commission recorded in `affiliate_sales` table
+- Calculated per order
+- Can be triggered on:
+  - Order payment confirmed (GCash)
+  - Order delivered (COD)
 
 ---
 
-## 7. Database Schema (Key Tables)
+## 7. Meta Pixel Integration
+
+### Supported Events
+
+| Event      | Trigger                |
+| ---------- | ---------------------- |
+| `Lead`     | Affiliate registration |
+| `Purchase` | Order completed        |
+
+### Pixel Configuration
+
+Each affiliate can have:
+
+- `pixel_id` - Meta Pixel ID
+- `store_id` - Store identifier
+- Access token configured via env: `META_ACCESS_TOKEN`
+
+---
+
+## 8. Database Schema
+
+### Key Tables
 
 ```sql
--- Users (extends Supabase auth.users)
+-- Users (extends Supabase auth)
 users
 
 -- Products
 products
 product_images
 
--- Orders
+-- Shopping
+cart_items
 orders
 order_items
 
 -- Affiliate System
 affiliates
+  - user_id
+  - payment_status (pending/paid)
+  - status (pending/active)
+  - pixel_id
+  - store_id
+
 affiliate_sales
+  - affiliate_id
+  - order_id
+  - commission_amount
 
 -- Tracking
 affiliate_tracking
+  - affiliate_id
+  - click_id
+  - store_id
+  - tracking_method
+
 affiliate_pixels
+  - affiliate_id
+  - pixel_id
+  - store_id
 ```
 
 ---
 
-## 8. Environment Variables
+## 9. Environment Variables
 
 ```env
 # Supabase
@@ -228,28 +445,31 @@ NODE_ENV=development
 PORT=3000
 FRONTEND_URL=http://localhost:5173
 APP_URL=http://localhost:3000
-PASSWORD_PEPPER=xxx
+PASSWORD_PEPPER=your-secure-pepper-min-16-chars
 
 # Payments
-PAYMONGO_SECRET_KEY=xxx
+PAYMONGO_SECRET_KEY=sk_live_xxx
 
 # Affiliate
 AFFILIATE_REGISTRATION_FEE=100
+
+# Meta Pixel (optional)
+META_ACCESS_TOKEN=xxx
 ```
 
 ---
 
-## 9. Running the Project
+## 10. Running the Project
 
 ### Development
 
 ```bash
 npm run dev
-# Server runs on http://localhost:3000
-# Swagger UI: http://localhost:3000/api/docs
+# Server: http://localhost:3000
+# Swagger: http://localhost:3000/api/docs
 ```
 
-### Build
+### Build & Production
 
 ```bash
 npm run build
@@ -265,32 +485,28 @@ npm run db:types        # Generate TypeScript types
 
 ---
 
-## 10. API Documentation
+## 11. Security Features
 
-Swagger UI is available at `/api/docs` in development mode.
-
-### Key Endpoints
-
-| Endpoint                             | Method       | Description          |
-| ------------------------------------ | ------------ | -------------------- |
-| `/api/auth/register`                 | POST         | Register new user    |
-| `/api/auth/login`                    | POST         | Login user           |
-| `/api/products`                      | GET/POST     | List/Create products |
-| `/api/cart`                          | GET/POST/PUT | Cart operations      |
-| `/api/orders`                        | POST         | Place order          |
-| `/api/orders/verify-gcash/:intentId` | GET          | Verify payment       |
-| `/api/affiliates`                    | GET/POST     | Affiliate operations |
-| `/api/affiliate-tracking/track`      | POST         | Track click          |
+- **Helmet.js** - HTTP security headers
+- **CORS** - Configured for frontend origin
+- **Rate Limiting** - Prevents abuse
+- **Input Sanitization** - MongoDB sanitize
+- **Zod Validation** - Request validation
+- **RLS Policies** - Supabase row-level security
+- **Password Hashing** - bcrypt
+- **Parameter Pollution** - HPP protection
 
 ---
 
-## 11. Security Features
+## 12. API Documentation
 
-- Helmet.js for HTTP headers
-- CORS configuration
-- Rate limiting
-- Input sanitization
-- Parameter pollution protection
-- Zod validation
-- RLS policies (Supabase)
-- Secure password hashing (bcrypt)
+Swagger UI is available at `/api/docs` in development mode.
+
+### Quick Links
+
+| Resource     | Path               |
+| ------------ | ------------------ |
+| Swagger UI   | `/api/docs`        |
+| Swagger JSON | `/api/docs.json`   |
+| Health Check | `/health`          |
+| Google OAuth | `/api/auth/google` |

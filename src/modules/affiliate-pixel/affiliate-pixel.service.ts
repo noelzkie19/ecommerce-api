@@ -28,7 +28,14 @@ export const sendPixelEvent = async (
   const token = accessToken || process.env.META_ACCESS_TOKEN;
 
   if (!token) {
-    throw new AppError("Meta access token not configured", 500);
+    // Return a failed result instead of throwing - pixel events are optional
+    return {
+      success: false,
+      eventId: event.eventId,
+      pixelId,
+      error: "Meta access token not configured",
+      response: undefined,
+    };
   }
 
   const url = `${META_CONVERSIONS_URL}/${pixelId}/events`;
