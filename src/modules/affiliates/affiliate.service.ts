@@ -147,15 +147,10 @@ export const verifyAffiliatePayment = async (
   intentId: string,
   userId: string,
 ) => {
-  console.log("[Affiliate Payment] Verifying payment:", { intentId, userId });
-
   const status = await paymongoUtils.getPaymentIntentStatus(intentId);
-  console.log("[Affiliate Payment] Payment status:", status);
-
   // Find the affiliate
   const affiliate = await affiliateRepository.findByUserId(userId);
   if (!affiliate) {
-    console.log("[Affiliate Payment] Affiliate not found for userId:", userId);
     throw new AppError("Affiliate not found", 404);
   }
 
