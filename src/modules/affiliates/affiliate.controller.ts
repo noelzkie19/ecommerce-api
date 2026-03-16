@@ -126,34 +126,61 @@ export const updateMyPixelId = catchAsync(
 
 export const getMyAffiliateStatus = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const userId = (req as any).user?.id;
+    const user = (req as any).user;
+    const userId = user?.id;
     if (!userId) {
       res.status(401).json({ success: false, message: "Unauthorized" });
       return;
     }
 
-    const affiliate = await affiliateService.getAffiliateByUserId(userId);
+    let affiliate = await affiliateService.getAffiliateByUserId(userId);
+
+    // Auto-create affiliate record if it doesn't exist (e.g. user registered before trigger)
     if (!affiliate) {
-      res.status(404).json({
-        success: false,
-        message: "No affiliate record found",
-      });
-      return;
+      const email = user.email ?? user.user_metadata?.email;
+      const name =
+        user.user_metadata?.full_name ??
+        user.user_metadata?.name ??
+        (email ? email.split("@")[0] : "Affiliate");
+      if (!email) {
+        res.status(404).json({
+          success: false,
+          message: "No affiliate record found",
+        });
+        return;
+      }
+      affiliate = await affiliateService.createAffiliateForAuthUser(
+        userId,
+        email,
+        name,
+      );
     }
+
+    const linkCode =
+      affiliate.affiliateLink ?? affiliate.affiliate_link ?? null;
+
+    // Safety check: if payment_status is unpaid, status should always be pending
+    // This ensures users can't access dashboard until they pay the registration fee
+    const effectiveStatus =
+      affiliate.paymentStatus === "unpaid" ||
+      affiliate.payment_status === "unpaid"
+        ? "pending"
+        : affiliate.status;
 
     sendSuccess(res, {
       id: affiliate.id,
-      status: affiliate.status,
-      paymentStatus: affiliate.paymentStatus,
+      status: effectiveStatus,
+      paymentStatus:
+        affiliate.paymentStatus ?? affiliate.payment_status ?? "unpaid",
       email: affiliate.email,
       name: affiliate.name,
-      storeId: buildStoreUrl(affiliate.store_id),
-      pixelId: affiliate.pixel_id,
-      affiliateLink: affiliate.affiliateLink
-        ? `${process.env.FRONTEND_URL || "http://localhost:5173"}/register?ref=${affiliate.affiliateLink}`
+      storeId: buildStoreUrl(affiliate.store_id ?? affiliate.storeId),
+      pixelId: affiliate.pixel_id ?? affiliate.pixelId,
+      affiliateLink: linkCode
+        ? `${process.env.FRONTEND_URL || "http://localhost:5173"}/register?ref=${linkCode}`
         : null,
-      affiliateLinkCode: affiliate.affiliateLink,
-      createdAt: affiliate.created_at,
+      affiliateLinkCode: linkCode,
+      createdAt: affiliate.created_at ?? affiliate.createdAt,
     });
   },
 );

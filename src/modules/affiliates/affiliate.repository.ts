@@ -33,6 +33,12 @@ async function enrichAffiliates(rows: any[]): Promise<any[]> {
         totalSales,
         totalCommissions,
         paymentStatus,
+        // camelCase aliases for snake_case fields
+        referredBy: aff.referred_by ?? null,
+        affiliateLink: aff.affiliate_link ?? null,
+        storeId: aff.store_id ?? null,
+        affiliateCommission: aff.affiliate_commission ?? 0,
+        pixelId: aff.pixel_id ?? null,
       };
     }),
   );
@@ -114,16 +120,21 @@ export const create = async (dto: CreateAffiliateDTO) => {
     authUser.user_metadata?.name ??
     authUser.email!.split("@")[0];
 
-  // 3. Insert into affiliates table
+  // 3. Generate store_id if not provided
+  const storeId =
+    dto.storeId ||
+    "store_" + Math.random().toString(36).substring(2, 10).toLowerCase();
+
+  // 4. Insert into affiliates table
   const { data, error } = await db
     .from("affiliates")
     .insert({
       user_id: authUser.id,
       name,
       email: authUser.email,
-      status: dto.status || "active",
+      status: dto.status || "pending",
       pixel_id: dto.pixelId,
-      store_id: dto.storeId,
+      store_id: storeId,
     })
     .select("*")
     .single();
@@ -160,6 +171,49 @@ export const update = async (id: string, dto: UpdateAffiliateDTO) => {
   if (error) throw new AppError("Affiliate not found", 404);
   const [enriched] = await enrichAffiliates([data]);
   return enriched;
+};
+
+/**
+ * Create an affiliate record directly from auth user data (no listUsers call).
+ * Used for auto-creating missing affiliate records for existing users.
+ */
+export const createForAuthUser = async (
+  userId: string,
+  email: string,
+  name: string,
+) => {
+  // Generate a unique store_id for this user
+  const storeId =
+    "store_" + Math.random().toString(36).substring(2, 10).toLowerCase();
+
+  const { data, error } = await db
+    .from("affiliates")
+    .insert({
+      user_id: userId,
+      name,
+      email,
+      status: "pending",
+      payment_status: "unpaid",
+      store_id: storeId,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      // Already exists — fetch and return it
+      return findByUserId(userId);
+    }
+    throw new AppError(error.message, 500);
+  }
+
+  return {
+    ...data,
+    paymentStatus: data.payment_status ?? "unpaid",
+    affiliateLink: data.affiliate_link ?? null,
+    referredBy: data.referred_by ?? null,
+    affiliateCommission: data.affiliate_commission ?? 0,
+  };
 };
 
 export const remove = async (id: string) => {
@@ -289,6 +343,49 @@ export const markAsPaidByUserId = async (userId: string) => {
   }
 };
 
+// ── Generate Affiliate Link ─────────────────────────────────────────────────
+/**
+ * Generate and set affiliate_link after successful payment
+ */
+export const generateAndSetAffiliateLink = async (userId: string) => {
+  // Get affiliate's email to generate link
+  const { data: affiliate, error: fetchError } = await db
+    .from("affiliates")
+    .select("email, affiliate_link")
+    .eq("user_id", userId)
+    .single();
+
+  if (fetchError || !affiliate) {
+    console.error("Affiliate not found for link generation:", fetchError);
+    return null;
+  }
+
+  // If already has link, return it
+  if (affiliate.affiliate_link) {
+    return affiliate.affiliate_link;
+  }
+
+  // Generate new link from email prefix + random chars
+  const emailPrefix = (affiliate.email?.split("@")[0] || "aff")
+    .substring(0, 3)
+    .toLowerCase();
+  const randomChars = Math.random().toString(36).substring(2, 8).toLowerCase();
+  const newLink = `${emailPrefix}${randomChars}`;
+
+  // Update with new link
+  const { error: updateError } = await db
+    .from("affiliates")
+    .update({ affiliate_link: newLink, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+
+  if (updateError) {
+    console.error("Failed to set affiliate_link:", updateError);
+    return null;
+  }
+
+  return newLink;
+};
+
 // ── Find Affiliate by Store ID ─────────────────────────────────────────────
 /**
  * Find affiliate by store_id (used for ?ref= tracking)
@@ -337,10 +434,13 @@ export const findByUserId = async (userId: string) => {
 
   if (error) return null;
 
-  // Add camelCase paymentStatus field
+  // Add camelCase aliases for commonly-used snake_case fields
   return {
     ...data,
     paymentStatus: data.payment_status ?? "unpaid",
+    affiliateLink: data.affiliate_link ?? null,
+    referredBy: data.referred_by ?? null,
+    affiliateCommission: data.affiliate_commission ?? 0,
   };
 };
 

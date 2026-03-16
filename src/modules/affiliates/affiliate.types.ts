@@ -15,6 +15,7 @@ export interface Affiliate {
   storeId?: string; // ← Store ID for affiliate
   affiliateLink?: string; // ← Unique referral link code
   referredBy?: string; // ← ID of affiliate who referred this user
+  affiliateCommission?: number; // ← Commission earned from referrals
   createdAt: string;
   updatedAt: string;
   /** Derived / joined fields returned by the repository */
