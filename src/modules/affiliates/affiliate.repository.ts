@@ -21,8 +21,6 @@ async function enrichAffiliates(rows: any[]): Promise<any[]> {
         .select("id", { count: "exact", head: true })
         .eq("affiliate_id", aff.id);
 
-      // Use stored totals from the database (updated when sales are approved)
-      // Fallback to 0 if columns don't exist yet
       const totalSales = aff.total_sales ?? 0;
       const totalCommissions = aff.total_commissions ?? 0;
       const paymentStatus = aff.payment_status ?? "unpaid";
@@ -114,7 +112,7 @@ export const create = async (dto: CreateAffiliateDTO) => {
     throw new AppError(`No registered user found with email ${dto.email}`, 404);
   }
 
-  // 2. Derive a display name: user_metadata.full_name → user_metadata.name → email prefix
+  // 2. Derive a display name
   const name: string =
     authUser.user_metadata?.full_name ??
     authUser.user_metadata?.name ??
@@ -176,13 +174,16 @@ export const update = async (id: string, dto: UpdateAffiliateDTO) => {
 /**
  * Create an affiliate record directly from auth user data (no listUsers call).
  * Used for auto-creating missing affiliate records for existing users.
+ *
+ * FIX: Now accepts an optional referredBy param so referred_by can be set
+ * immediately at creation time, rather than in a separate update call.
  */
 export const createForAuthUser = async (
   userId: string,
   email: string,
   name: string,
+  referredBy?: string, // ← NEW: optional referrer ID
 ) => {
-  // Generate a unique store_id for this user
   const storeId =
     "store_" + Math.random().toString(36).substring(2, 10).toLowerCase();
 
@@ -195,6 +196,7 @@ export const createForAuthUser = async (
       status: "pending",
       payment_status: "unpaid",
       store_id: storeId,
+      referred_by: referredBy ?? null, // ← FIX: persist on insert
     })
     .select("*")
     .single();
@@ -287,7 +289,6 @@ export const updateTotals = async (
   saleAmount: number,
   commissionEarned: number,
 ) => {
-  // Get current totals
   const { data: affiliate, error: fetchError } = await db
     .from("affiliates")
     .select("total_sales, total_commissions")
@@ -313,9 +314,7 @@ export const updateTotals = async (
 };
 
 // ── Activate Affiliate by User ID ───────────────────────────────────────────────
-/**
- * Activate affiliate when they complete their first payment/order
- */
+
 export const activateByUserId = async (userId: string) => {
   const { error } = await db
     .from("affiliates")
@@ -329,9 +328,7 @@ export const activateByUserId = async (userId: string) => {
 };
 
 // ── Mark Affiliate as Paid ─────────────────────────────────────────────────
-/**
- * Mark affiliate as paid after successful payment
- */
+
 export const markAsPaidByUserId = async (userId: string) => {
   const { error } = await db
     .from("affiliates")
@@ -344,11 +341,8 @@ export const markAsPaidByUserId = async (userId: string) => {
 };
 
 // ── Generate Affiliate Link ─────────────────────────────────────────────────
-/**
- * Generate and set affiliate_link after successful payment
- */
+
 export const generateAndSetAffiliateLink = async (userId: string) => {
-  // Get affiliate's email to generate link
   const { data: affiliate, error: fetchError } = await db
     .from("affiliates")
     .select("email, affiliate_link")
@@ -372,7 +366,6 @@ export const generateAndSetAffiliateLink = async (userId: string) => {
   const randomChars = Math.random().toString(36).substring(2, 8).toLowerCase();
   const newLink = `${emailPrefix}${randomChars}`;
 
-  // Update with new link
   const { error: updateError } = await db
     .from("affiliates")
     .update({ affiliate_link: newLink, updated_at: new Date().toISOString() })
@@ -387,14 +380,12 @@ export const generateAndSetAffiliateLink = async (userId: string) => {
 };
 
 // ── Find Affiliate by Store ID ─────────────────────────────────────────────
-/**
- * Find affiliate by store_id (used for ?ref= tracking)
- */
+
 export const findByStoreId = async (storeId: string) => {
   const { data, error } = await db
     .from("affiliates")
     .select("id, name, email, status, pixel_id, store_id")
-    .eq("store_id", storeId)
+    .ilike("store_id", storeId)
     .single();
 
   if (error) return null;
@@ -402,9 +393,7 @@ export const findByStoreId = async (storeId: string) => {
 };
 
 // ── Update Pixel ID by User ID ─────────────────────────────────────────────
-/**
- * Update pixel_id for the affiliate belonging to the given user
- */
+
 export const updatePixelByUserId = async (userId: string, pixelId: string) => {
   const { data, error } = await db
     .from("affiliates")
@@ -422,9 +411,7 @@ export const updatePixelByUserId = async (userId: string, pixelId: string) => {
 };
 
 // ── Find Affiliate by User ID ───────────────────────────────────────────────
-/**
- * Find affiliate by user_id
- */
+
 export const findByUserId = async (userId: string) => {
   const { data, error } = await db
     .from("affiliates")
@@ -434,7 +421,6 @@ export const findByUserId = async (userId: string) => {
 
   if (error) return null;
 
-  // Add camelCase aliases for commonly-used snake_case fields
   return {
     ...data,
     paymentStatus: data.payment_status ?? "unpaid",
@@ -446,15 +432,11 @@ export const findByUserId = async (userId: string) => {
 
 // ── Affiliate Settings ───────────────────────────────────────────────────────────
 
-/**
- * Get all affiliate settings
- */
 export const getSettings = async () => {
   const { data, error } = await db.from("affiliate_settings").select("*");
 
   if (error) throw new AppError("Failed to fetch settings", 500);
 
-  // Convert to key-value object
   const settings: Record<string, string> = {};
   data?.forEach((row: any) => {
     settings[row.key] = row.value;
@@ -471,9 +453,6 @@ export const getSettings = async () => {
   };
 };
 
-/**
- * Update affiliate settings
- */
 export const updateSettings = async (
   registrationFee?: number,
   referralCommissionRate?: number,
@@ -507,23 +486,21 @@ export const updateSettings = async (
   return getSettings();
 };
 
-/**
- * Get affiliate by affiliate_link
- */
+// ── Find Affiliate by Affiliate Link ───────────────────────────────────────
+
 export const findByAffiliateLink = async (link: string) => {
   const { data, error } = await db
     .from("affiliates")
     .select("id, name, email, status, pixel_id, store_id, affiliate_link")
-    .eq("affiliate_link", link)
+    .ilike("affiliate_link", link)
     .single();
 
   if (error) return null;
   return data;
 };
 
-/**
- * Update affiliate's referred_by field
- */
+// ── Update Referred By ─────────────────────────────────────────────────────
+
 export const updateReferredBy = async (
   affiliateId: string,
   referredById: string,
@@ -537,3 +514,8 @@ export const updateReferredBy = async (
     console.error("Failed to update referred_by:", error);
   }
 };
+
+// ── Activate Affiliate by User ID (for use from outside module) ────────────
+
+export const activateAffiliateByUserId = async (userId: string) =>
+  activateByUserId(userId);

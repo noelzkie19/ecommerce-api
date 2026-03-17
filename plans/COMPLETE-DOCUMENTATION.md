@@ -1,10 +1,40 @@
-# Triad E-Commerce API - Project Overview
+# Triad E-Commerce API - Complete Documentation
+
+## Table of Contents
+
+1. [Project Summary](#1-project-summary)
+2. [Tech Stack](#2-tech-stack)
+3. [Project Structure](#3-project-structure)
+4. [API Modules & Endpoints](#4-api-modules--endpoints)
+5. [Database Schema](#5-database-schema)
+6. [Process Flows](#6-process-flows)
+7. [Payment Processing](#7-payment-processing)
+8. [Affiliate System](#8-affiliate-system)
+9. [Meta Pixel Integration](#9-meta-pixel-integration)
+10. [Environment Variables](#10-environment-variables)
+11. [Running the Project](#11-running-the-project)
+12. [Security Features](#12-security-features)
+13. [API Documentation](#13-api-documentation)
+
+---
 
 ## 1. Project Summary
 
-**Triad-Ecomm** is a full-featured e-commerce backend API with affiliate marketing capabilities.
+**Triad-Ecomm** is a full-featured e-commerce backend API with affiliate marketing capabilities. It provides a complete solution for:
 
-### Tech Stack
+- User authentication (email/password + Google OAuth)
+- Product catalog management
+- Shopping cart functionality
+- Order processing with multiple payment methods
+- Affiliate program with commission tracking
+- Meta Pixel event integration for analytics
+- Inventory/stock management
+- Wishlist functionality
+- Product testimonials/reviews
+
+---
+
+## 2. Tech Stack
 
 | Layer          | Technology                               |
 | -------------- | ---------------------------------------- |
@@ -18,7 +48,7 @@
 
 ---
 
-## 2. Project Structure
+## 3. Project Structure
 
 ```
 src/
@@ -53,6 +83,10 @@ src/
 │   │   └── auth.validation.ts
 │   │
 │   ├── users/             # User management
+│   │   ├── users.controller.ts
+│   │   ├── users.routes.ts
+│   │   ├── users.service.ts
+│   │   └── users.repository.ts
 │   │
 │   ├── products/          # Product catalog
 │   │   ├── products.controller.ts
@@ -74,10 +108,23 @@ src/
 │   │   └── order.repository.ts
 │   │
 │   ├── stocks/            # Inventory management
+│   │   ├── stocks.controller.ts
+│   │   ├── stocks.routes.ts
+│   │   ├── stocks.service.ts
+│   │   └── stocks.repository.ts
 │   │
 │   ├── wishlist/          # User wishlists
+│   │   ├── wishlist.controller.ts
+│   │   ├── wishlist.routes.ts
+│   │   ├── wishlist.service.ts
+│   │   └── wishlist.repository.ts
 │   │
 │   ├── testimonials/      # Product reviews
+│   │   ├── testimonials.public.controller.ts
+│   │   ├── testimonials.admin.controller.ts
+│   │   ├── testimonials.routes.ts
+│   │   ├── testimonials.service.ts
+│   │   └── testimonials.repository.ts
 │   │
 │   ├── affiliates/        # Affiliate program
 │   │   ├── affiliate.controller.ts
@@ -87,6 +134,11 @@ src/
 │   │   └── affiliate.types.ts
 │   │
 │   ├── affiliates-sales/  # Affiliate commissions
+│   │   ├── affiliate-sales.controller.ts
+│   │   ├── affiliate-sales.routes.ts
+│   │   ├── affiliate-sales.service.ts
+│   │   ├── affiliate-sales.repository.ts
+│   │   └── affiliate-sales.types.ts
 │   │
 │   ├── affiliate-tracking/ # Click attribution
 │   │   ├── affiliate-tracking.controller.ts
@@ -100,6 +152,7 @@ src/
 │       ├── affiliate-pixel.routes.ts
 │       ├── affiliate-pixel.service.ts
 │       ├── affiliate-pixel.repository.ts
+│       ├── affiliate-pixel.types.ts
 │       └── affiliate-pixel.utils.ts
 │
 └── utils/
@@ -108,7 +161,7 @@ src/
 
 ---
 
-## 3. API Modules
+## 4. API Modules & Endpoints
 
 ### Authentication (`/api/auth`)
 
@@ -198,11 +251,113 @@ src/
 | `/`      | POST   | Create pixel config |
 | `/fire`  | POST   | Fire pixel event    |
 
+### Affiliate Sales (`/api/affiliate-sales`)
+
+| Endpoint         | Method | Description            |
+| ---------------- | ------ | ---------------------- |
+| `/`              | GET    | Get affiliate sales    |
+| `/affiliate/:id` | GET    | Get sales by affiliate |
+
+### Stocks (`/api/stocks`)
+
+| Endpoint | Method | Description      |
+| -------- | ------ | ---------------- |
+| `/`      | GET    | Get all stocks   |
+| `/:sku`  | GET    | Get stock by SKU |
+
+### Wishlist (`/api/wishlist`)
+
+| Endpoint      | Method | Description          |
+| ------------- | ------ | -------------------- |
+| `/`           | GET    | Get wishlist items   |
+| `/`           | POST   | Add to wishlist      |
+| `/:productId` | DELETE | Remove from wishlist |
+
+### Testimonials (`/api/testimonials`)
+
+| Endpoint | Method | Description        |
+| -------- | ------ | ------------------ |
+| `/`      | GET    | List testimonials  |
+| `/`      | POST   | Create testimonial |
+| `/:id`   | DELETE | Delete (admin)     |
+
+### Users (`/api/users`)
+
+| Endpoint | Method | Description      |
+| -------- | ------ | ---------------- |
+| `/me`    | GET    | Get current user |
+
 ---
 
-## 4. End-to-End Process Flows
+## 5. Database Schema
 
-### 4.1 Customer Purchase Flow
+### Key Tables
+
+```sql
+-- Users (extends Supabase auth)
+users
+
+-- Products
+products
+product_images
+
+-- Shopping
+cart_items
+orders
+order_items
+
+-- Affiliate System
+affiliates
+  - user_id
+  - payment_status (pending/paid)
+  - status (pending/active)
+  - pixel_id
+  - store_id
+  - affiliate_link
+  - referred_by (FK to affiliates.id)
+  - affiliate_commission (DECIMAL - earned from referrals)
+
+affiliate_settings
+  - key
+  - value
+
+affiliate_sales
+  - affiliate_id
+  - order_id
+  - commission_amount
+
+-- Tracking
+affiliate_tracking
+  - affiliate_id
+  - click_id
+  - store_id
+  - tracking_method
+
+affiliate_pixels
+  - affiliate_id
+  - pixel_id
+  - store_id
+```
+
+### Migrations
+
+| File                                           | Description                                |
+| ---------------------------------------------- | ------------------------------------------ |
+| `20260314_add_pixel_store_ids.sql`             | Add pixel and store ID columns             |
+| `20260315_affiliate_tracking_pixel.sql`        | Affiliate tracking and pixel tables        |
+| `20260316_auto_create_affiliate.sql`           | Auto-create affiliate on user registration |
+| `20260317_add_affiliate_payment_status.sql`    | Add payment status to affiliates           |
+| `20260318_fix_affiliates_rls_for_triggers.sql` | Fix RLS policies                           |
+| `20260319_affiliate_link_commission.sql`       | Add affiliate link and commission columns  |
+| `20260320_fix_trigger_with_affiliate_link.sql` | Fix trigger with affiliate link            |
+| `20260321_add_referral_commission_columns.sql` | Add referral commission columns            |
+| `20260322_add_affiliate_commission_column.sql` | Add affiliate commission column            |
+
+---
+
+## 6. Process Flows
+
+### 6.1 Customer Purchase Flow
 
 ```mermaid
 sequenceDiagram
@@ -242,7 +397,7 @@ sequenceDiagram
     API-->>Frontend: Order confirmed
 ```
 
-### 4.2 Affiliate Registration Flow
+### 6.2 Affiliate Registration Flow
 
 ```mermaid
 sequenceDiagram
@@ -266,7 +421,7 @@ sequenceDiagram
 
     Frontend->>User: Display payment link
     User->>Maya: Click → Opens Maya Wallet
-    User->>Maya: Pay registration fee (₱100)
+    User->>Maya: Pay registration fee (₱999)
 
     rect rgb(200, 255, 200)
         Note right of PayMongo: PATH A: Webhook (Recommended)
@@ -298,7 +453,7 @@ sequenceDiagram
     Note over API: 4. Record referral commission
 ```
 
-### 4.3 Affiliate Referral Flow
+### 6.3 Affiliate Referral Flow
 
 ```mermaid
 sequenceDiagram
@@ -337,7 +492,7 @@ sequenceDiagram
 
 ---
 
-## 5. Payment Processing (PayMongo)
+## 7. Payment Processing
 
 ### Supported Payment Methods
 
@@ -372,9 +527,18 @@ const paymentMethod = {
 5. **Verify** → Webhook or callback verifies payment
 6. **Confirm** → Order confirmed, stock deducted, affiliate credited
 
+### Key Differences: QRPH vs PayMaya
+
+| Feature        | QRPH (Previous)                    | PayMaya (New)                         |
+| -------------- | ---------------------------------- | ------------------------------------- |
+| Payment Type   | QR Code                            | Deep Link                             |
+| User Action    | Scan QR with any wallet app        | Click link opens Maya directly        |
+| Implementation | `payment_method_allowed: ["qrph"]` | `payment_method_allowed: ["paymaya"]` |
+| Return Data    | `qrCodeUrl` (base64 image)         | `redirectUrl` (deep link URL)         |
+
 ---
 
-## 6. Affiliate System
+## 8. Affiliate System
 
 ### Affiliate Status Flow
 
@@ -382,7 +546,7 @@ const paymentMethod = {
 [New User]
     ↓ (registers)
 [Pending] - Needs to pay registration fee
-    ↓ (pays ₱100)
+    ↓ (pays ₱999)
 [Paid] - Payment verified
     ↓ (auto-activated)
 [Active] - Can earn commissions
@@ -467,7 +631,7 @@ await recordReferralCommissionIfNeeded(affiliate, settings.registrationFee);
 
 ---
 
-## 7. Meta Pixel Integration
+## 9. Meta Pixel Integration
 
 ### Supported Events
 
@@ -484,61 +648,56 @@ Each affiliate can have:
 - `store_id` - Store identifier
 - Access token configured via env: `META_ACCESS_TOKEN`
 
----
+### Purchase Event
 
-## 8. Database Schema
+```json
+{
+  "event_name": "Purchase",
+  "event_time": 1699123456,
+  "event_id": "order_123_unique_id",
+  "user_data": {
+    "em": ["hash@example.com"],
+    "client_ip_address": "192.168.1.1",
+    "client_user_agent": "Mozilla/5.0..."
+  },
+  "custom_data": {
+    "value": 99.99,
+    "currency": "PHP",
+    "contents": [{ "id": "product_1", "quantity": 2, "item_price": 49.99 }],
+    "order_id": "order_123"
+  },
+  "event_source_url": "https://store.com/checkout",
+  "action_source": "WEBSITE"
+}
+```
 
-### Key Tables
+### Lead Event
 
-```sql
--- Users (extends Supabase auth)
-users
-
--- Products
-products
-product_images
-
--- Shopping
-cart_items
-orders
-order_items
-
--- Affiliate System
-affiliates
-  - user_id
-  - payment_status (pending/paid)
-  - status (pending/active)
-  - pixel_id
-  - store_id
-  - affiliate_link
-  - referred_by (FK to affiliates.id)
-  - affiliate_commission (DECIMAL - earned from referrals)
-
-affiliate_settings
-  - key
-  - value
-
-affiliate_sales
-  - affiliate_id
-  - order_id
-  - commission_amount
-
--- Tracking
-affiliate_tracking
-  - affiliate_id
-  - click_id
-  - store_id
-  - tracking_method
-
-affiliate_pixels
-  - affiliate_id
-  - pixel_id
-  - store_id
+```json
+{
+  "event_name": "Lead",
+  "event_time": 1699123456,
+  "event_id": "lead_123_unique_id",
+  "user_data": {
+    "em": ["hash@example.com"],
+    "fn": ["John"],
+    "ln": ["Doe"]
+  },
+  "custom_data": {
+    "value": 0,
+    "currency": "PHP",
+    "lead_type": "affiliate_signup"
+  },
+  "event_source_url": "https://store.com/affiliate/signup",
+  "action_source": "WEBSITE"
+}
 ```
 
 ---
 
-## 9. Environment Variables
+## 10. Environment Variables
+
+### Required Variables
 
 ```env
 # Supabase
@@ -551,14 +710,13 @@ NODE_ENV=development
 PORT=3001
 FRONTEND_URL=http://localhost:3000
 BACKEND_URL=http://localhost:3001
-APP_URL=http://localhost:3000
 PASSWORD_PEPPER=your-secure-pepper-min-16-chars
 
 # Payments
 PAYMONGO_SECRET_KEY=sk_live_xxx
 
 # Affiliate
-AFFILIATE_REGISTRATION_FEE=100
+AFFILIATE_REGISTRATION_FEE=999
 
 # Meta Pixel (optional)
 META_ACCESS_TOKEN=xxx
@@ -566,16 +724,17 @@ META_ACCESS_TOKEN=xxx
 
 ### Environment Variable Details
 
-| Variable     | Default | Description                         |
-| ------------ | ------- | ----------------------------------- |
-| PORT         | 3001    | Express server port                 |
-| FRONTEND_URL | -       | Frontend URL (Next.js on port 3000) |
-| BACKEND_URL  | -       | Backend URL (Express on port 3001)  |
-| APP_URL      | -       | Legacy - use FRONTEND_URL instead   |
+| Variable                   | Default     | Description                               |
+| -------------------------- | ----------- | ----------------------------------------- |
+| PORT                       | 3000        | Express server port                       |
+| NODE_ENV                   | development | Environment (development/production/test) |
+| FRONTEND_URL               | -           | Frontend URL (Next.js on port 3000)       |
+| BACKEND_URL                | -           | Backend URL (Express on port 3001)        |
+| AFFILIATE_REGISTRATION_FEE | 999         | Registration fee for affiliates           |
 
 ---
 
-## 10. Running the Project
+## 11. Running the Project
 
 ### Development
 
@@ -598,11 +757,18 @@ npm start
 ```bash
 npm run db:migrate      # Push migrations
 npm run db:types        # Generate TypeScript types
+npm run db:migration:create  # Create new migration
+```
+
+### Testing
+
+```bash
+npm test
 ```
 
 ---
 
-## 11. Security Features
+## 12. Security Features
 
 - **Helmet.js** - HTTP security headers
 - **CORS** - Configured for frontend origin
@@ -613,9 +779,16 @@ npm run db:types        # Generate TypeScript types
 - **Password Hashing** - bcrypt
 - **Parameter Pollution** - HPP protection
 
+### Cookie Security
+
+- HttpOnly: false (needs JavaScript access)
+- Secure: true (HTTPS only in production)
+- SameSite: "Lax" (allows navigation) or "Strict"
+- Max-Age: 30 days
+
 ---
 
-## 12. API Documentation
+## 13. API Documentation
 
 Swagger UI is available at `/api/docs` in development mode.
 
@@ -627,3 +800,107 @@ Swagger UI is available at `/api/docs` in development mode.
 | Swagger JSON | `/api/docs.json`   |
 | Health Check | `/health`          |
 | Google OAuth | `/api/auth/google` |
+
+---
+
+## Package.json Scripts
+
+| Script                        | Description                 |
+| ----------------------------- | --------------------------- |
+| `npm run dev`                 | Start development server    |
+| `npm run build`               | Build for production        |
+| `npm start`                   | Start production server     |
+| `npm run typecheck`           | Type check without emitting |
+| `npm test`                    | Run tests                   |
+| `npm run db:migrate`          | Push database migrations    |
+| `npm run db:types`            | Generate TypeScript types   |
+| `npm run db:migration:create` | Create new migration        |
+
+---
+
+## Dependencies
+
+### Production Dependencies
+
+| Package                | Version | Purpose                        |
+| ---------------------- | ------- | ------------------------------ |
+| @supabase/supabase-js  | ^2.45.0 | Supabase client                |
+| bcryptjs               | ^2.4.3  | Password hashing               |
+| cookie-parser          | ^1.4.7  | Cookie parsing                 |
+| cors                   | ^2.8.5  | CORS middleware                |
+| dotenv                 | ^17.3.1 | Environment variables          |
+| express                | ^4.21.0 | Web framework                  |
+| express-mongo-sanitize | ^2.2.0  | Input sanitization             |
+| express-rate-limit     | ^7.5.0  | Rate limiting                  |
+| helmet                 | ^8.0.0  | Security headers               |
+| hpp                    | ^0.2.3  | Parameter pollution prevention |
+| morgan                 | ^1.10.0 | HTTP logging                   |
+| multer                 | ^2.1.0  | File uploads                   |
+| swagger-jsdoc          | ^6.2.8  | Swagger documentation          |
+| swagger-ui-express     | ^5.0.1  | Swagger UI                     |
+| winston                | ^3.17.0 | Logging                        |
+| zod                    | ^3.24.0 | Schema validation              |
+
+---
+
+## Appendix: Affiliate Tracking Design
+
+### Database Tables for Tracking
+
+#### affiliate_tracking_links
+
+```sql
+CREATE TABLE IF NOT EXISTS affiliate_tracking_links (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    affiliate_id UUID REFERENCES affiliates(id) ON DELETE CASCADE,
+    store_id TEXT NOT NULL,
+    campaign_name TEXT,
+    landing_page_url TEXT,
+    click_count INTEGER DEFAULT 0,
+    conversion_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT true
+);
+```
+
+#### affiliate_attributions
+
+```sql
+CREATE TABLE IF NOT EXISTS affiliate_attributions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+    affiliate_id UUID REFERENCES affiliates(id) ON DELETE SET NULL,
+    tracking_method VARCHAR(20) NOT NULL CHECK (tracking_method IN ('cookie', 'url_param', 'manual')),
+    pixel_id TEXT,
+    store_id TEXT,
+    click_id TEXT,
+    referrer_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+#### affiliate_pixel_events
+
+```sql
+CREATE TABLE IF NOT EXISTS affiliate_pixel_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    affiliate_id UUID REFERENCES affiliates(id) ON DELETE SET NULL,
+    order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+    event_type VARCHAR(50) NOT NULL CHECK (event_type IN ('Purchase', 'Lead', 'ViewContent', 'AddToCart')),
+    pixel_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    event_data JSONB,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+    meta_response JSONB,
+    retry_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    sent_at TIMESTAMP WITH TIME ZONE
+);
+```
+
+---
+
+_Document Version: 2.0_
+_Last Updated: 2026-03-17_
+_Consolidated from: project-overview.md, affiliate-referral-system.md, affiliate-registration-callback-backend.md, affiliate-metapixel-design.md, maya-wallet-implementation.md_

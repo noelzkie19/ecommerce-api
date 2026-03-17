@@ -78,7 +78,13 @@ export type GoogleLoginInput = z.infer<typeof googleLoginSchema>;
 export const validate =
   <T extends z.ZodTypeAny>(schema: T) =>
   (req: Request, _res: Response, next: NextFunction): void => {
+    console.log("[Validate] Raw body:", JSON.stringify(req.body));
     const result = schema.safeParse(req.body);
+    console.log(
+      "[Validate] Parsed result:",
+      result.success ? "success" : "failed",
+      result.data,
+    );
 
     if (!result.success) {
       const message = result.error.errors.map((e) => e.message).join(", ");

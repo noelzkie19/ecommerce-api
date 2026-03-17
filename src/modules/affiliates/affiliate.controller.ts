@@ -73,7 +73,6 @@ export const activateAffiliate = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateAffiliateIdParam(req.params);
 
-    // Check if affiliate has paid before activating
     const affiliate = await affiliateService.getAffiliate(id);
     if (affiliate.paymentStatus !== "paid") {
       res.status(400).json({
@@ -135,7 +134,6 @@ export const getMyAffiliateStatus = catchAsync(
 
     let affiliate = await affiliateService.getAffiliateByUserId(userId);
 
-    // Auto-create affiliate record if it doesn't exist (e.g. user registered before trigger)
     if (!affiliate) {
       const email = user.email ?? user.user_metadata?.email;
       const name =
@@ -159,8 +157,6 @@ export const getMyAffiliateStatus = catchAsync(
     const linkCode =
       affiliate.affiliateLink ?? affiliate.affiliate_link ?? null;
 
-    // Safety check: if payment_status is unpaid, status should always be pending
-    // This ensures users can't access dashboard until they pay the registration fee
     const effectiveStatus =
       affiliate.paymentStatus === "unpaid" ||
       affiliate.payment_status === "unpaid"
@@ -236,10 +232,24 @@ export const createAffiliatePayment = catchAsync(
       return;
     }
 
+    // FIX: Frontend sends { referralCode } in the body.
+    // Also support affiliateLink from query params as a fallback.
+    const affiliateLink =
+      (req.body.referralCode as string | undefined) ||
+      (req.query.affiliateLink as string | undefined) ||
+      (req.body.affiliateLink as string | undefined) ||
+      undefined;
+
+    console.log(
+      "[createAffiliatePayment] affiliateLink from request:",
+      affiliateLink,
+    );
+
     const result = await affiliateService.createAffiliatePayment(
       userId,
       userEmail,
       userFullName,
+      affiliateLink,
     );
     sendSuccess(res, result, "Payment initiated");
   },
@@ -247,26 +257,34 @@ export const createAffiliatePayment = catchAsync(
 
 export const verifyAffiliatePayment = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const { intentId, userId } = req.query;
+    console.log("[Controller] verifyAffiliatePayment called");
+    const { intentId, userId, affiliateLink } = req.query;
+    console.log("[Controller] params:", { intentId, userId, affiliateLink });
 
     if (!intentId || !userId) {
-      res
-        .status(400)
-        .json({ success: false, message: "Missing intentId or userId" });
-      return;
+      const redirectUrl = `${env.FRONTEND_URL}/affiliate/registration/callback?error=missing_params`;
+      console.log("[Controller] Missing params, redirecting to:", redirectUrl);
+      return res.redirect(redirectUrl);
     }
 
+    console.log(
+      "[Controller] Calling affiliateService.verifyAffiliatePayment...",
+    );
     const result = await affiliateService.verifyAffiliatePayment(
       intentId as string,
       userId as string,
+      affiliateLink as string | undefined,
     );
+    console.log("[Controller] Result:", result);
 
     if (result.success) {
-      sendSuccess(res, result, "Payment verified successfully");
+      const redirectUrl = `${env.FRONTEND_URL}/affiliate/registration/callback?status=success`;
+      console.log("[Controller] Success, redirecting to:", redirectUrl);
+      return res.redirect(redirectUrl);
     } else {
-      res
-        .status(400)
-        .json({ success: false, message: `Payment status: ${result.status}` });
+      const redirectUrl = `${env.FRONTEND_URL}/affiliate/registration/callback?error=payment_failed&status=${result.status}`;
+      console.log("[Controller] Failed, redirecting to:", redirectUrl);
+      return res.redirect(redirectUrl);
     }
   },
 );
@@ -286,14 +304,25 @@ export const paymongoWebhook = catchAsync(
         | string
         | undefined;
 
-      // Extract user_id from metadata that we passed when creating the payment
       const metadata = event.data?.attributes?.metadata as
-        | { user_id?: string }
+        | { user_id?: string; affiliate_link?: string }
         | undefined;
       const userId = metadata?.user_id;
+      // FIX: Only pass affiliateLink if it's a non-empty string
+      const affiliateLink =
+        metadata?.affiliate_link && metadata.affiliate_link.trim() !== ""
+          ? metadata.affiliate_link
+          : undefined;
+
+      console.log("[Affiliate Webhook] metadata:", metadata);
+      console.log("[Affiliate Webhook] affiliateLink:", affiliateLink);
 
       if (intentId && userId) {
-        await affiliateService.verifyAffiliatePayment(intentId, userId);
+        await affiliateService.verifyAffiliatePayment(
+          intentId,
+          userId,
+          affiliateLink,
+        );
       } else {
         console.warn(
           "[Affiliate Webhook] Missing intentId or userId in metadata",
@@ -301,7 +330,6 @@ export const paymongoWebhook = catchAsync(
       }
     }
 
-    // Always return 200 so PayMongo doesn't retry
     sendSuccess(res, null, "Webhook received");
   },
 );
@@ -340,5 +368,64 @@ export const getMyAffiliateLink = catchAsync(
 
     const result = await affiliateService.getMyAffiliateLink(userId);
     sendSuccess(res, result);
+  },
+);
+
+// ── Manual Referral (Admin/Testing) ─────────────────────────────────────────────
+
+export const setAffiliateReferrer = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const { affiliateId, referrerId } = req.body;
+
+    if (!affiliateId || !referrerId) {
+      throw new AppError("Both affiliateId and referrerId are required", 400);
+    }
+
+    await affiliateService.setAffiliateReferrer(affiliateId, referrerId);
+    sendSuccess(res, null, "Referrer updated successfully");
+  },
+);
+
+export const triggerReferralCommission = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const { affiliateId, paymentAmount } = req.body;
+
+    if (!affiliateId || !paymentAmount) {
+      throw new AppError(
+        "Both affiliateId and paymentAmount are required",
+        400,
+      );
+    }
+
+    const result = await affiliateService.recordReferralCommission(
+      affiliateId,
+      paymentAmount,
+    );
+
+    if (!result) {
+      throw new AppError(
+        "No referral commission recorded. Check if the affiliate has a referrer.",
+        400,
+      );
+    }
+
+    sendSuccess(res, result, "Referral commission recorded");
+  },
+);
+
+// ── Add Commission by Referral Code (Admin) ─────────────────────────────────
+
+export const addCommissionByReferralCode = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const { referralCode } = req.body;
+
+    if (!referralCode) {
+      throw new AppError("referralCode is required", 400);
+    }
+
+    const result =
+      await affiliateService.addCommissionByReferralCode(referralCode);
+
+    sendSuccess(res, result, "Commission added successfully");
   },
 );

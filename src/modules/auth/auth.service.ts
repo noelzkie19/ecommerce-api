@@ -17,6 +17,11 @@ import { AppError } from "../../common/utils/AppError";
 export const registerUser = async (
   dto: RegisterDTO,
 ): Promise<AuthResponse | { message: string }> => {
+  console.log("[Register] Full DTO received:", JSON.stringify(dto));
+  console.log(
+    "[Register] Received referralCode:",
+    dto.referralCode ? `"${dto.referralCode}"` : "not provided",
+  );
   const pepperedPassword = pepperPassword(dto.password);
 
   const { data, error } = await supabase.auth.signUp({
@@ -90,14 +95,46 @@ async function linkReferral(
       findByStoreId,
     } = await import("../affiliates/affiliate.repository");
 
+    console.log("[Referral] Looking for referrer with code:", referralCode);
+
+    // Try to find referrer by affiliate_link first, then store_id
     let referrer = await findByAffiliateLink(referralCode);
-    if (!referrer) referrer = await findByStoreId(referralCode);
-    if (!referrer) return;
+    console.log("[Referral] findByAffiliateLink result:", referrer);
+    if (!referrer) {
+      console.log("[Referral] Not found by affiliate_link, trying store_id");
+      referrer = await findByStoreId(referralCode);
+      console.log("[Referral] findByStoreId result:", referrer);
+    }
 
-    const newAffiliate = await findByUserId(newUserId);
-    if (!newAffiliate) return;
+    if (!referrer) {
+      console.error("[Referral] Referrer not found for code:", referralCode);
+      return;
+    }
 
+    console.log("[Referral] Found referrer:", referrer.id, referrer.name);
+
+    // Wait a bit for the affiliate record to be created (in case of async trigger)
+    let newAffiliate = await findByUserId(newUserId);
+    if (!newAffiliate) {
+      console.log("[Referral] Affiliate not found, waiting...");
+      // Wait and retry
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      newAffiliate = await findByUserId(newUserId);
+    }
+
+    if (!newAffiliate) {
+      console.error("[Referral] New affiliate not found for user:", newUserId);
+      return;
+    }
+
+    console.log(
+      "[Referral] Linking affiliate",
+      newAffiliate.id,
+      "to referrer",
+      referrer.id,
+    );
     await updateReferredBy(newAffiliate.id, referrer.id);
+    console.log("[Referral] Successfully linked!");
   } catch (err) {
     console.error("[Referral] Failed to link referral:", err);
   }

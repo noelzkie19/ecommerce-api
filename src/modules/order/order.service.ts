@@ -48,10 +48,11 @@ export const placeOrder = async (
     const discount = dto.discount ?? 0;
     const total = subtotal - discount;
 
-    const appUrl =
-      process.env.APP_URL ??
-      process.env.FRONTEND_URL ??
-      "http://localhost:3000";
+    // Use BACKEND_URL for payment callbacks (Express runs on port 3001)
+    // Use FRONTEND_URL for user-facing pages
+    const backendUrl =
+      process.env.BACKEND_URL ??
+      `http://localhost:${process.env.PORT || "3001"}`;
 
     const intent = await paymongoUtils.createPaymentIntent(total);
     paymentIntentId = intent.intentId;
@@ -61,7 +62,7 @@ export const placeOrder = async (
       intent.clientKey,
       dto.email,
       dto.fullName,
-      `${appUrl}/checkout/callback?intent_id=${intent.intentId}`,
+      `${backendUrl}/checkout/callback?intent_id=${intent.intentId}`,
     );
 
     mayaRedirectUrl = redirectUrl;
