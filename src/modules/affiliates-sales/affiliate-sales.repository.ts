@@ -13,14 +13,7 @@ const selectFields = `
 
 // ── Record sales for a confirmed/delivered order ───────────────────────────────
 
-/**
- * Called after an order reaches "confirmed" or "delivered".
- * Looks up which order items have affiliate-assigned products,
- * calculates commission, and upserts affiliate_sales rows
- * (upsert on order_item_id so it's idempotent).
- */
 export const recordSalesForOrder = async (orderId: string): Promise<void> => {
-  // 1. Load order items with product info
   const { data: items, error: itemsError } = await db
     .from("order_items")
     .select("id, product_id, quantity, unit_price")
@@ -31,22 +24,17 @@ export const recordSalesForOrder = async (orderId: string): Promise<void> => {
 
   const productIds = items.map((i: any) => i.product_id);
 
-  // 2. Find affiliate_products rows for these products
   const { data: apRows, error: apError } = await db
     .from("affiliate_products")
     .select("affiliate_id, product_id, commission_type, commission_value")
     .in("product_id", productIds);
 
   if (apError) throw new AppError(apError.message, 500);
-  if (!apRows?.length) return; // no affiliate involvement
+  if (!apRows?.length) return;
 
-  // Build a map: product_id → affiliate assignment
   const apMap = new Map<string, any>();
-  for (const ap of apRows) {
-    apMap.set(ap.product_id, ap);
-  }
+  for (const ap of apRows) apMap.set(ap.product_id, ap);
 
-  // 3. Build upsert rows
   const salesRows = items
     .filter((item: any) => apMap.has(item.product_id))
     .map((item: any) => {
@@ -77,7 +65,15 @@ export const recordSalesForOrder = async (orderId: string): Promise<void> => {
     .from("affiliate_sales")
     .upsert(salesRows, { onConflict: "order_item_id" });
 
-  if (upsertError) throw new AppError(upsertError.message, 500);
+  if (upsertError) {
+    if (upsertError.message?.includes("order_item_id")) {
+      throw new AppError(
+        "Database migration required. Run 20260321_add_referral_commission_columns.sql",
+        500,
+      );
+    }
+    throw new AppError(upsertError.message, 500);
+  }
 };
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────

@@ -48,10 +48,11 @@ export const placeOrder = async (
     const discount = dto.discount ?? 0;
     const total = subtotal - discount;
 
-    const appUrl =
-      process.env.APP_URL ??
-      process.env.FRONTEND_URL ??
-      "http://localhost:3000";
+    // Use BACKEND_URL for payment callbacks (Express runs on port 3001)
+    // Use FRONTEND_URL for user-facing pages
+    const backendUrl =
+      process.env.BACKEND_URL ??
+      `http://localhost:${process.env.PORT || "3001"}`;
 
     const intent = await paymongoUtils.createPaymentIntent(total);
     paymentIntentId = intent.intentId;
@@ -61,7 +62,7 @@ export const placeOrder = async (
       intent.clientKey,
       dto.email,
       dto.fullName,
-      `${appUrl}/checkout/callback?intent_id=${intent.intentId}`,
+      `${backendUrl}/checkout/callback?intent_id=${intent.intentId}`,
     );
 
     mayaRedirectUrl = redirectUrl;
@@ -95,9 +96,8 @@ export const placeOrder = async (
         clickId: attributionData.clickId,
         trackingMethod: (attributionData.trackingMethod as any) || "url_param",
       });
-    } catch (error) {
-      console.error("Failed to attribute order to affiliate:", error);
-      // Don't fail the order if attribution fails
+    } catch {
+      // Silent fail
     }
   }
 
@@ -210,9 +210,8 @@ export const verifyGCashPayment = async (intentId: string) => {
           order.id,
           orderWithAffiliate.affiliate_id,
         );
-      } catch (error) {
-        console.error("Failed to fire Meta Pixel event:", error);
-        // Don't fail the order if pixel event fails
+      } catch {
+        // Silent fail
       }
     }
 
@@ -257,8 +256,12 @@ export const updateOrderStatus = async (id: string, status: OrderStatus) => {
     if (order?.affiliate_id) {
       try {
         await pixelService.firePurchaseEvent(id, order.affiliate_id);
-      } catch (error) {
-        console.error("Failed to fire Meta Pixel event on delivery:", error);
+      } catch (err) {
+        // Non-critical — pixel firing should not block order confirmation
+        console.warn(
+          "[verifyGCashPayment] Meta Pixel firePurchaseEvent failed:",
+          err,
+        );
       }
     }
   }

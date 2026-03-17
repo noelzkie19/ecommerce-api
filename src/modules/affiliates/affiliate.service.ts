@@ -42,7 +42,6 @@ export const assignProduct = async (
   affiliateId: string,
   dto: AssignProductDTO,
 ) => {
-  // Verify affiliate exists before assigning
   await affiliateRepository.findById(affiliateId);
 
   if (dto.commissionValue <= 0) {
@@ -84,6 +83,19 @@ export const markAffiliateAsPaidByUserId = (userId: string) =>
 export const getAffiliateByUserId = (userId: string) =>
   affiliateRepository.findByUserId(userId);
 
+// ── Generate Affiliate Link ─────────────────────────────────────────────────
+
+export const generateAffiliateLink = (userId: string) =>
+  affiliateRepository.generateAndSetAffiliateLink(userId);
+
+// ── Auto-create Affiliate for Auth User ──────────────────────────────────────
+
+export const createAffiliateForAuthUser = (
+  userId: string,
+  email: string,
+  name: string,
+) => affiliateRepository.createForAuthUser(userId, email, name);
+
 // ── Update Pixel ID for Current User ─────────────────────────────────────────
 
 export const updateMyPixelId = (userId: string, pixelId: string) =>
@@ -95,6 +107,7 @@ export const createAffiliatePayment = async (
   userId: string,
   email: string,
   fullName: string,
+  affiliateLink?: string,
 ) => {
   // Find or create affiliate record
   let affiliate = await affiliateRepository.findByUserId(userId);
@@ -112,58 +125,107 @@ export const createAffiliatePayment = async (
     throw new AppError("Affiliate registration fee already paid", 400);
   }
 
+  // ── FIX: Persist referred_by as early as possible ─────────────────────────
+  // Do this at payment creation time so it's stored even if the redirect URL
+  if (affiliateLink) {
+    const existingReferredBy =
+      affiliate.referredBy ?? affiliate.referred_by ?? null;
+
+    if (!existingReferredBy) {
+      const referrer =
+        await affiliateRepository.findByAffiliateLink(affiliateLink);
+
+      if (referrer && referrer.id !== affiliate.id) {
+        await affiliateRepository.updateReferredBy(affiliate.id, referrer.id);
+      }
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   // Create payment intent for registration fee
   const registrationFee = Number.parseFloat(
     process.env.AFFILIATE_REGISTRATION_FEE || "100",
   );
 
-  // Pass user_id in metadata so webhook can identify the user
+  // Pass user_id and affiliate_link in metadata so webhook can identify the user and referrer
   const intent = await paymongoUtils.createPaymentIntent(registrationFee, {
     user_id: userId,
     type: "affiliate_registration",
+    affiliate_link: affiliateLink || "",
   });
 
-  const appUrl =
-    process.env.APP_URL ?? process.env.FRONTEND_URL ?? "http://localhost:3000";
+  // Use BACKEND_URL for payment callbacks (Express runs on port 3001)
+  const backendUrl =
+    process.env.BACKEND_URL ?? `http://localhost:${process.env.PORT || "3001"}`;
 
-  const { redirectUrl } = await paymongoUtils.attachMayaToIntent(
-    intent.intentId,
-    intent.clientKey,
-    email,
-    fullName,
-    `${appUrl}/api/affiliates/payment/verify?intentId=${intent.intentId}&userId=${userId}`,
-  );
+  // Build the redirect URL with affiliate_link if provided
+  let redirectUrl = `${backendUrl}/api/affiliates/payment/verify?intentId=${intent.intentId}&userId=${userId}`;
+  if (affiliateLink) {
+    redirectUrl += `&affiliateLink=${encodeURIComponent(affiliateLink)}`;
+  }
+
+  const { redirectUrl: paymentRedirectUrl } =
+    await paymongoUtils.attachMayaToIntent(
+      intent.intentId,
+      intent.clientKey,
+      email,
+      fullName,
+      redirectUrl,
+    );
 
   return {
     paymentIntentId: intent.intentId,
-    redirectUrl,
+    redirectUrl: paymentRedirectUrl,
     amount: registrationFee,
   };
 };
 
-// ── Verify Affiliate Registration Payment ───────────────────────────────────
+// ── Credit Referrer Commission ───────────────────────────────────────────────
 
 /**
- * Helper to record referral commission if the affiliate was referred
+ * Credit commission directly to a referrer affiliate by their ID.
+ * Uses the current settings to calculate the commission amount.
  */
-async function recordReferralCommissionIfNeeded(
-  affiliate: { id: string; referred_by: string | null },
+async function creditReferrerCommission(
+  referrerId: string,
   registrationFee: number,
 ): Promise<void> {
-  if (!affiliate?.referred_by) {
+  const settings = await affiliateRepository.getSettings();
+  const { referralCommissionRate, referralCommissionType } = settings;
+
+  const commissionAmount =
+    referralCommissionType === "percentage"
+      ? (registrationFee * referralCommissionRate) / 100
+      : referralCommissionRate;
+
+  if (commissionAmount <= 0) {
     return;
   }
 
   try {
-    const commissionResult = await recordReferralCommission(
-      affiliate.id,
-      registrationFee,
-    );
-    if (commissionResult) {
-      console.log("[Referral Commission] Recorded:", commissionResult);
+    const { supabaseAdmin } = await import("../../config/supabase");
+
+    const { data: referrerData } = await supabaseAdmin
+      .from("affiliates")
+      .select("affiliate_commission")
+      .eq("id", referrerId)
+      .single();
+
+    const currentCommission = referrerData?.affiliate_commission ?? 0;
+
+    const { error } = await supabaseAdmin
+      .from("affiliates")
+      .update({
+        affiliate_commission: currentCommission + commissionAmount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", referrerId);
+
+    if (error) {
+      return;
     }
-  } catch (error) {
-    console.error("[Referral Commission] Failed to record:", error);
+  } catch {
+    // Silent fail
   }
 }
 
@@ -196,23 +258,165 @@ async function fireAffiliateRegistrationPixel(
     });
 
     await sendPixelEvent(event, pixelId);
-  } catch (error) {
-    console.error("Failed to fire Meta Pixel Lead event:", error);
+  } catch {
+    // Silent fail
   }
 }
+
+// ── Ensure Affiliate Exists ───────────────────────────────────────────────────
+
+/**
+ * Ensure affiliate record exists, auto-creating if missing.
+ * Accepts an optional affiliateLink so referred_by can be set on auto-creation.
+ */
+async function ensureAffiliateExists(
+  userId: string,
+  affiliateLink?: string,
+): Promise<{
+  id: string;
+  paymentStatus: string;
+  referredBy?: string;
+  referred_by?: string;
+}> {
+  let affiliate = await affiliateRepository.findByUserId(userId);
+
+  if (!affiliate) {
+    const { supabaseAdmin } = await import("../../config/supabase");
+    const { data: userData } =
+      await supabaseAdmin.auth.admin.getUserById(userId);
+
+    if (userData?.user) {
+      const email = userData.user.email || "";
+      const name =
+        userData.user.user_metadata?.full_name ||
+        userData.user.user_metadata?.name ||
+        email.split("@")[0];
+
+      // Resolve referrer before creating so referred_by is set from the start
+      let referredById: string | undefined;
+      if (affiliateLink) {
+        const referrer =
+          await affiliateRepository.findByAffiliateLink(affiliateLink);
+        if (referrer) {
+          referredById = referrer.id;
+        }
+      }
+
+      affiliate = await affiliateRepository.createForAuthUser(
+        userId,
+        email,
+        name,
+        referredById,
+      );
+    }
+
+    if (!affiliate) {
+      throw new AppError("Affiliate not found", 404);
+    }
+  }
+
+  return affiliate;
+}
+
+// ── Find Referrer Affiliate ───────────────────────────────────────────────────
+
+/**
+ * Find the referrer affiliate based on affiliateLink param or existing referred_by field.
+ * Priority: affiliateLink param → referred_by field already on the record.
+ */
+async function findReferrerAffiliate(
+  affiliate: { id: string; referredBy?: string; referred_by?: string },
+  affiliateLink?: string,
+): Promise<{ id: string; [key: string]: any } | null> {
+  // First try: affiliateLink query param
+  if (affiliateLink) {
+    const referrer =
+      await affiliateRepository.findByAffiliateLink(affiliateLink);
+    if (referrer) {
+      return referrer;
+    }
+  }
+
+  // Fall back: existing referred_by field (set early in createAffiliatePayment)
+  const existingReferrerId =
+    affiliate.referredBy ?? affiliate.referred_by ?? null;
+  if (existingReferrerId) {
+    const referrer = await affiliateRepository.findById(existingReferrerId);
+    return referrer;
+  }
+
+  return null;
+}
+
+// ── Process Successful Payment ────────────────────────────────────────────────
+
+/**
+ * Process successful payment - activate affiliate and handle referral commission.
+ */
+async function processSuccessfulPayment(
+  userId: string,
+  affiliate: { id: string; referredBy?: string; referred_by?: string },
+  affiliateLink?: string,
+): Promise<{ success: boolean; status: string; alreadyConfirmed: boolean }> {
+  // 1. Mark as paid
+  await affiliateRepository.markAsPaidByUserId(userId);
+
+  // 2. Activate the affiliate
+  await affiliateRepository.activateByUserId(userId);
+
+  // 3. Generate affiliate link
+  await affiliateRepository.generateAndSetAffiliateLink(userId);
+
+  // 4. Fetch settings for commission calculation
+  const settings = await affiliateRepository.getSettings();
+
+  // ── Referral handling ──────────────────────────────────────────────────────
+  // Re-fetch affiliate so we have the latest referred_by (set in createAffiliatePayment)
+  const freshAffiliate = await affiliateRepository.findByUserId(userId);
+  const affiliateWithReferral = freshAffiliate ?? affiliate;
+
+  const referrerAffiliate = await findReferrerAffiliate(
+    affiliateWithReferral,
+    affiliateLink,
+  );
+
+  if (referrerAffiliate) {
+    // Ensure referred_by is persisted (idempotent — may already be set)
+    const currentReferredBy =
+      affiliateWithReferral.referredBy ??
+      affiliateWithReferral.referred_by ??
+      null;
+
+    if (!currentReferredBy) {
+      await affiliateRepository.updateReferredBy(
+        affiliateWithReferral.id,
+        referrerAffiliate.id,
+      );
+    }
+
+    // Credit commission to the referrer
+    await creditReferrerCommission(
+      referrerAffiliate.id,
+      settings.registrationFee,
+    );
+  }
+
+  return { success: true, status: "succeeded", alreadyConfirmed: false };
+}
+
+// ── Verify Affiliate Registration Payment ───────────────────────────────────
 
 export const verifyAffiliatePayment = async (
   intentId: string,
   userId: string,
+  affiliateLink?: string,
 ) => {
   const status = await paymongoUtils.getPaymentIntentStatus(intentId);
-  // Find the affiliate
-  const affiliate = await affiliateRepository.findByUserId(userId);
-  if (!affiliate) {
-    throw new AppError("Affiliate not found", 404);
-  }
 
-  // Avoid double-processing already paid affiliates
+  // Ensure affiliate record exists (pass affiliateLink so referred_by is set on auto-create)
+  const affiliate = await ensureAffiliateExists(userId, affiliateLink);
+
+  // Already confirmed — idempotent guard
   if (affiliate.paymentStatus === "paid") {
     return {
       success: true,
@@ -221,34 +425,12 @@ export const verifyAffiliatePayment = async (
     };
   }
 
+  // Handle based on payment status
   if (status === "succeeded") {
-    // 1. Mark affiliate as paid
-    await affiliateRepository.markAsPaidByUserId(userId);
+    return processSuccessfulPayment(userId, affiliate, affiliateLink);
+  }
 
-    // 2. Activate the affiliate (same as order flow)
-    await affiliateRepository.activateByUserId(userId);
-
-    // 3. Get settings for registration fee and record referral commission
-    const settings = await affiliateRepository.getSettings();
-    const registrationFee = settings.registrationFee;
-
-    // 4. Record referral commission if this affiliate was referred
-    await recordReferralCommissionIfNeeded(affiliate, registrationFee);
-
-    // 5. Fire Meta Pixel Lead event for affiliate registration
-    if (affiliate.pixel_id) {
-      await fireAffiliateRegistrationPixel(
-        userId,
-        registrationFee,
-        affiliate.pixel_id,
-        affiliate.email,
-        affiliate.name,
-        affiliate.store_id ?? undefined,
-      );
-    }
-
-    return { success: true, status, alreadyConfirmed: false };
-  } else if (status === "payment_intent.payment_failed") {
+  if (status === "payment_intent.payment_failed") {
     return { success: false, status };
   }
 
@@ -281,83 +463,189 @@ export const getMyAffiliateLink = async (userId: string) => {
     throw new AppError("Affiliate not found", 404);
   }
 
+  const linkCode = affiliate.affiliateLink ?? null;
+
+  if (!linkCode) {
+    throw new AppError("Affiliate link not yet generated", 404);
+  }
+
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-  const affiliateLink = `${frontendUrl}/register?ref=${affiliate.affiliateLink}`;
+  const affiliateLink = `${frontendUrl}/register?ref=${linkCode}`;
 
   return {
     affiliateLink,
-    affiliateLinkCode: affiliate.affiliateLink,
+    affiliateLinkCode: linkCode,
   };
 };
 
 // ── Commission Calculation for Referrals ───────────────────────────────────────
 
 /**
- * Record commission for referring a new affiliate
- * Called when a referred affiliate completes payment
+ * Manually set the referrer for an affiliate (for testing/admin purposes)
+ */
+export const setAffiliateReferrer = async (
+  affiliateId: string,
+  referrerId: string,
+) => affiliateRepository.updateReferredBy(affiliateId, referrerId);
+
+/**
+ * Record commission for referring a new affiliate.
+ * Looks up the referrer via the referred affiliate's referred_by field,
+ * then credits them the appropriate commission.
  */
 export const recordReferralCommission = async (
   referredAffiliateId: string,
   paymentAmount: number,
 ) => {
-  // Get the referred affiliate
   const referredAffiliate =
     await affiliateRepository.findById(referredAffiliateId);
-  if (!referredAffiliate?.referredBy) {
-    return null; // No referrer
+
+  const referrerId =
+    referredAffiliate?.referredBy ?? referredAffiliate?.referred_by;
+
+  if (!referrerId) {
+    return null;
   }
 
-  // Get commission settings
   const settings = await affiliateRepository.getSettings();
   const { referralCommissionRate, referralCommissionType } = settings;
 
-  // Calculate commission
-  let commissionAmount = 0;
-  if (referralCommissionType === "percentage") {
-    commissionAmount = (paymentAmount * referralCommissionRate) / 100;
-  } else {
-    commissionAmount = referralCommissionRate;
-  }
+  const commissionAmount =
+    referralCommissionType === "percentage"
+      ? (paymentAmount * referralCommissionRate) / 100
+      : referralCommissionRate;
 
-  if (commissionAmount <= 0) {
-    return null;
-  }
+  if (commissionAmount <= 0) return null;
 
-  // Record the commission sale for the referrer
-  const { error } = await (
-    await import("../../config/supabase")
-  ).supabaseAdmin
-    .from("affiliate_sales")
-    .insert({
-      affiliate_id: referredAffiliate.referredBy,
-      referred_affiliate_id: referredAffiliateId,
-      order_id: null, // No order, this is a registration
-      sale_amount: paymentAmount,
-      commission_earned: commissionAmount,
-      status: "approved", // Auto-approve for registration commissions
-      type: "referral",
+  const referrerAffiliate = await affiliateRepository.findById(referrerId);
+  const currentAffiliateCommission =
+    referrerAffiliate?.affiliateCommission ?? 0;
+
+  const { supabaseAdmin } = await import("../../config/supabase");
+  const { error } = await supabaseAdmin
+    .from("affiliates")
+    .update({
+      affiliate_commission: currentAffiliateCommission + commissionAmount,
+      updated_at: new Date().toISOString(),
     })
-    .select()
-    .single();
+    .eq("id", referrerId);
 
   if (error) {
-    console.error("Failed to record referral commission:", error);
     return null;
   }
 
-  // Update referrer's totals
-  await affiliateRepository.updateTotals(
-    referredAffiliate.referredBy,
-    paymentAmount,
-    commissionAmount,
+  return { referrerId, paymentAmount, commissionAmount };
+};
+
+/**
+ * Manually link a referral and add commission.
+ * Used by admin to fix referrals that weren't linked during registration.
+ */
+export const manuallyLinkReferral = async (
+  referralCode: string,
+  newUserId: string,
+) => {
+  const { findByAffiliateLink, findByUserId, updateReferredBy, findByStoreId } =
+    await import("../affiliates/affiliate.repository");
+
+  let referrer = await findByAffiliateLink(referralCode);
+  if (!referrer) {
+    referrer = await findByStoreId(referralCode);
+  }
+
+  if (!referrer) {
+    throw new AppError("Referrer not found for code: " + referralCode, 404);
+  }
+
+  const newAffiliate = await findByUserId(newUserId);
+  if (!newAffiliate) {
+    throw new AppError("Affiliate not found for user: " + newUserId, 404);
+  }
+
+  await updateReferredBy(newAffiliate.id, referrer.id);
+
+  const settings = await import("../affiliates/affiliate.repository").then(
+    (r) => r.getSettings(),
   );
 
+  const { referralCommissionRate, referralCommissionType } = settings;
+  const registrationFee = settings.registrationFee;
+
+  const commissionAmount =
+    referralCommissionType === "percentage"
+      ? (registrationFee * referralCommissionRate) / 100
+      : referralCommissionRate;
+
+  const { supabaseAdmin } = await import("../../config/supabase");
+  const { data: currentData } = await supabaseAdmin
+    .from("affiliates")
+    .select("affiliate_commission")
+    .eq("id", referrer.id)
+    .single();
+
+  const currentCommission = currentData?.affiliate_commission ?? 0;
+
+  await supabaseAdmin
+    .from("affiliates")
+    .update({
+      affiliate_commission: currentCommission + commissionAmount,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", referrer.id);
+
   return {
-    referredAffiliateId,
-    referrerId: referredAffiliate.referredBy,
-    paymentAmount,
-    commissionRate: referralCommissionRate,
-    commissionType: referralCommissionType,
+    referrerId: referrer.id,
+    newAffiliateId: newAffiliate.id,
+    commissionAmount,
+  };
+};
+
+/**
+ * Add commission to affiliate by referral code.
+ * Searches affiliate by affiliate_link and credits them commission.
+ */
+export const addCommissionByReferralCode = async (referralCode: string) => {
+  const { findByAffiliateLink } =
+    await import("../affiliates/affiliate.repository");
+
+  const referrer = await findByAffiliateLink(referralCode);
+
+  if (!referrer) {
+    throw new AppError("Affiliate not found for code: " + referralCode, 404);
+  }
+
+  const settings = await import("../affiliates/affiliate.repository").then(
+    (r) => r.getSettings(),
+  );
+
+  const { referralCommissionRate, referralCommissionType } = settings;
+  const registrationFee = settings.registrationFee;
+
+  const commissionAmount =
+    referralCommissionType === "percentage"
+      ? (registrationFee * referralCommissionRate) / 100
+      : referralCommissionRate;
+
+  const { supabaseAdmin } = await import("../../config/supabase");
+  const { data: currentData } = await supabaseAdmin
+    .from("affiliates")
+    .select("affiliate_commission")
+    .eq("id", referrer.id)
+    .single();
+
+  const currentCommission = currentData?.affiliate_commission ?? 0;
+
+  await supabaseAdmin
+    .from("affiliates")
+    .update({
+      affiliate_commission: currentCommission + commissionAmount,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", referrer.id);
+
+  return {
+    affiliateId: referrer.id,
+    affiliateLink: referrer.affiliate_link,
     commissionAmount,
   };
 };

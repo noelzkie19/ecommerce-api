@@ -55,9 +55,8 @@ export const affiliateTrackingMiddleware = (
     }
 
     next();
-  } catch (error) {
-    // Don't block request on attribution errors
-    console.error("Affiliate tracking middleware error:", error);
+  } catch {
+    // Silent fail
     next();
   }
 };

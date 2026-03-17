@@ -14,6 +14,7 @@ const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
   FRONTEND_URL: z.string().url(),
+  BACKEND_URL: z.string().url(),
   AFFILIATE_REGISTRATION_FEE: z.string().default("999"),
 });
 

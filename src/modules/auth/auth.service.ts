@@ -34,8 +34,20 @@ export const registerUser = async (
 
   if (!data.user) throw new AppError("Registration failed", 500);
 
-  // Affiliate is now auto-created by database trigger on auth.users
-  // See supabase/migrations/20260316_auto_create_affiliate.sql
+  // Explicitly create affiliate record for new user
+  // (DB trigger should handle this, but we ensure it exists as a fallback)
+  const { createForAuthUser } =
+    await import("../affiliates/affiliate.repository");
+  await createForAuthUser(
+    data.user.id,
+    data.user.email!,
+    dto.fullName || data.user.email!.split("@")[0],
+  );
+
+  // If a referral code was provided, link the new affiliate to the referrer
+  if (dto.referralCode && data.user) {
+    await linkReferral(data.user.id, dto.referralCode);
+  }
 
   if (!data.session) {
     return {
@@ -44,6 +56,7 @@ export const registerUser = async (
     };
   }
 
+  // New users always start as pending (must pay registration fee first)
   return {
     accessToken: data.session.access_token,
     refreshToken: data.session.refresh_token,
@@ -52,8 +65,52 @@ export const registerUser = async (
       email: data.user.email!,
       fullName: dto.fullName,
     },
+    affiliateStatus: "pending",
   };
 };
+
+/**
+ * Link a new user's affiliate record to the referrer identified by referralCode.
+ */
+async function linkReferral(
+  newUserId: string,
+  referralCode: string,
+): Promise<void> {
+  try {
+    const {
+      findByAffiliateLink,
+      findByUserId,
+      updateReferredBy,
+      findByStoreId,
+    } = await import("../affiliates/affiliate.repository");
+
+    // Try to find referrer by affiliate_link first, then store_id
+    let referrer = await findByAffiliateLink(referralCode);
+    if (!referrer) {
+      referrer = await findByStoreId(referralCode);
+    }
+
+    if (!referrer) {
+      return;
+    }
+
+    // Wait a bit for the affiliate record to be created (in case of async trigger)
+    let newAffiliate = await findByUserId(newUserId);
+    if (!newAffiliate) {
+      // Wait and retry
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      newAffiliate = await findByUserId(newUserId);
+    }
+
+    if (!newAffiliate) {
+      return;
+    }
+
+    await updateReferredBy(newAffiliate.id, referrer.id);
+  } catch {
+    // Silently fail - referral linking is not critical
+  }
+}
 
 /* ─────────────────────────────────────────────
    LOGIN
@@ -71,6 +128,16 @@ export const loginUser = async (dto: LoginDTO): Promise<AuthResponse> => {
     throw new AppError("Invalid email or password", 401);
   }
 
+  // Determine affiliate status so frontend can redirect correctly
+  let affiliateStatus: "pending" | "active" | "suspended" = "pending";
+  const { findByUserId } = await import("../affiliates/affiliate.repository");
+  const affiliate = await findByUserId(data.user.id);
+  if (affiliate) {
+    // If payment_status is unpaid, always treat as pending
+    affiliateStatus =
+      affiliate.payment_status === "paid" ? affiliate.status : "pending";
+  }
+
   return {
     accessToken: data.session.access_token,
     refreshToken: data.session.refresh_token,
@@ -79,6 +146,7 @@ export const loginUser = async (dto: LoginDTO): Promise<AuthResponse> => {
       email: data.user.email!,
       fullName: data.user.user_metadata?.full_name ?? "",
     },
+    affiliateStatus,
   };
 };
 
@@ -191,14 +259,34 @@ export const googleLogin = async (
       });
 
     if (createError || !newUser.user) {
-      console.error("Google user creation error:", createError);
-      throw new AppError("Failed to create Google user", 500);
+      throw new AppError(
+        createError?.message || "Failed to create Google user",
+        500,
+      );
     }
 
     user = newUser.user;
-  }
 
-  // Affiliate is now auto-created by database trigger on auth.users
+    // Explicitly create affiliate record for new Google user
+    // (DB trigger may not fire for admin-created users)
+    try {
+      const { createForAuthUser } =
+        await import("../affiliates/affiliate.repository");
+      await createForAuthUser(
+        user.id,
+        user.email!,
+        dto.fullName || user.email!.split("@")[0],
+      );
+    } catch (err) {
+      // Don't fail login if affiliate creation fails (trigger may have already created it)
+      console.warn("[googleLogin] Affiliate creation skipped:", err);
+    }
+
+    // Link referral if a referral code was provided (new user only)
+    if (dto.referralCode) {
+      await linkReferral(user.id, dto.referralCode);
+    }
+  }
 
   await supabaseAdmin.auth.admin.updateUserById(user.id, {
     user_metadata: {
@@ -228,6 +316,20 @@ export const googleLogin = async (
     throw new AppError("Failed to create Google session", 500);
   }
 
+  // Determine affiliate status: check the actual affiliate record
+  let affiliateStatus: "pending" | "active" | "suspended" = "pending";
+  try {
+    const { findByUserId } = await import("../affiliates/affiliate.repository");
+    const affiliate = await findByUserId(verifyData.user.id);
+    if (affiliate) {
+      // If payment_status is unpaid, always treat as pending
+      affiliateStatus =
+        affiliate.payment_status === "paid" ? affiliate.status : "pending";
+    }
+  } catch {
+    // Silent fail
+  }
+
   return {
     accessToken: verifyData.session.access_token,
     refreshToken: verifyData.session.refresh_token,
@@ -237,6 +339,7 @@ export const googleLogin = async (
       fullName: verifyData.user.user_metadata?.full_name ?? dto.fullName,
       role: verifyData.user.app_metadata?.role ?? "user",
     },
+    affiliateStatus,
   };
 };
 
