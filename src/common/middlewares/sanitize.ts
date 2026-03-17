@@ -1,8 +1,5 @@
-import mongoSanitize from 'express-mongo-sanitize'
-import { RequestHandler, Request } from 'express'
+import mongoSanitize from "express-mongo-sanitize";
+import { RequestHandler } from "express";
 export const sanitizeInput: RequestHandler = mongoSanitize({
-  replaceWith: '_',
-  onSanitize: ({ req, key }: { req: Request; key: string }) => {
-    console.warn(`Sanitized key "${key}" on ${req.method} ${req.path}`)
-  },
-})
+  replaceWith: "_",
+});

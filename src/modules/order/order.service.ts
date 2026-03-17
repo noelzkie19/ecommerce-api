@@ -96,9 +96,8 @@ export const placeOrder = async (
         clickId: attributionData.clickId,
         trackingMethod: (attributionData.trackingMethod as any) || "url_param",
       });
-    } catch (error) {
-      console.error("Failed to attribute order to affiliate:", error);
-      // Don't fail the order if attribution fails
+    } catch {
+      // Silent fail
     }
   }
 
@@ -211,9 +210,8 @@ export const verifyGCashPayment = async (intentId: string) => {
           order.id,
           orderWithAffiliate.affiliate_id,
         );
-      } catch (error) {
-        console.error("Failed to fire Meta Pixel event:", error);
-        // Don't fail the order if pixel event fails
+      } catch {
+        // Silent fail
       }
     }
 
@@ -258,8 +256,12 @@ export const updateOrderStatus = async (id: string, status: OrderStatus) => {
     if (order?.affiliate_id) {
       try {
         await pixelService.firePurchaseEvent(id, order.affiliate_id);
-      } catch (error) {
-        console.error("Failed to fire Meta Pixel event on delivery:", error);
+      } catch (err) {
+        // Non-critical — pixel firing should not block order confirmation
+        console.warn(
+          "[verifyGCashPayment] Meta Pixel firePurchaseEvent failed:",
+          err,
+        );
       }
     }
   }

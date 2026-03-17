@@ -240,11 +240,6 @@ export const createAffiliatePayment = catchAsync(
       (req.body.affiliateLink as string | undefined) ||
       undefined;
 
-    console.log(
-      "[createAffiliatePayment] affiliateLink from request:",
-      affiliateLink,
-    );
-
     const result = await affiliateService.createAffiliatePayment(
       userId,
       userEmail,
@@ -257,33 +252,24 @@ export const createAffiliatePayment = catchAsync(
 
 export const verifyAffiliatePayment = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    console.log("[Controller] verifyAffiliatePayment called");
     const { intentId, userId, affiliateLink } = req.query;
-    console.log("[Controller] params:", { intentId, userId, affiliateLink });
 
     if (!intentId || !userId) {
       const redirectUrl = `${env.FRONTEND_URL}/affiliate/registration/callback?error=missing_params`;
-      console.log("[Controller] Missing params, redirecting to:", redirectUrl);
       return res.redirect(redirectUrl);
     }
 
-    console.log(
-      "[Controller] Calling affiliateService.verifyAffiliatePayment...",
-    );
     const result = await affiliateService.verifyAffiliatePayment(
       intentId as string,
       userId as string,
       affiliateLink as string | undefined,
     );
-    console.log("[Controller] Result:", result);
 
     if (result.success) {
       const redirectUrl = `${env.FRONTEND_URL}/affiliate/registration/callback?status=success`;
-      console.log("[Controller] Success, redirecting to:", redirectUrl);
       return res.redirect(redirectUrl);
     } else {
       const redirectUrl = `${env.FRONTEND_URL}/affiliate/registration/callback?error=payment_failed&status=${result.status}`;
-      console.log("[Controller] Failed, redirecting to:", redirectUrl);
       return res.redirect(redirectUrl);
     }
   },
@@ -308,14 +294,10 @@ export const paymongoWebhook = catchAsync(
         | { user_id?: string; affiliate_link?: string }
         | undefined;
       const userId = metadata?.user_id;
-      // FIX: Only pass affiliateLink if it's a non-empty string
       const affiliateLink =
         metadata?.affiliate_link && metadata.affiliate_link.trim() !== ""
           ? metadata.affiliate_link
           : undefined;
-
-      console.log("[Affiliate Webhook] metadata:", metadata);
-      console.log("[Affiliate Webhook] affiliateLink:", affiliateLink);
 
       if (intentId && userId) {
         await affiliateService.verifyAffiliatePayment(
@@ -324,9 +306,7 @@ export const paymongoWebhook = catchAsync(
           affiliateLink,
         );
       } else {
-        console.warn(
-          "[Affiliate Webhook] Missing intentId or userId in metadata",
-        );
+        sendSuccess(res, null, "Webhook received - missing metadata");
       }
     }
 

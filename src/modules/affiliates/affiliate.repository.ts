@@ -323,7 +323,7 @@ export const activateByUserId = async (userId: string) => {
     .eq("status", "pending");
 
   if (error) {
-    console.error("Failed to activate affiliate:", error);
+    return;
   }
 };
 
@@ -336,7 +336,7 @@ export const markAsPaidByUserId = async (userId: string) => {
     .eq("user_id", userId);
 
   if (error) {
-    console.error("Failed to mark affiliate as paid:", error);
+    return;
   }
 };
 
@@ -350,7 +350,6 @@ export const generateAndSetAffiliateLink = async (userId: string) => {
     .single();
 
   if (fetchError || !affiliate) {
-    console.error("Affiliate not found for link generation:", fetchError);
     return null;
   }
 
@@ -372,7 +371,6 @@ export const generateAndSetAffiliateLink = async (userId: string) => {
     .eq("user_id", userId);
 
   if (updateError) {
-    console.error("Failed to set affiliate_link:", updateError);
     return null;
   }
 
@@ -479,7 +477,7 @@ export const updateSettings = async (
       );
 
     if (error) {
-      console.error(`Failed to update setting ${key}:`, error);
+      continue;
     }
   }
 
@@ -511,7 +509,7 @@ export const updateReferredBy = async (
     .eq("id", affiliateId);
 
   if (error) {
-    console.error("Failed to update referred_by:", error);
+    return;
   }
 };
 

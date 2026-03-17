@@ -17,11 +17,6 @@ import { AppError } from "../../common/utils/AppError";
 export const registerUser = async (
   dto: RegisterDTO,
 ): Promise<AuthResponse | { message: string }> => {
-  console.log("[Register] Full DTO received:", JSON.stringify(dto));
-  console.log(
-    "[Register] Received referralCode:",
-    dto.referralCode ? `"${dto.referralCode}"` : "not provided",
-  );
   const pepperedPassword = pepperPassword(dto.password);
 
   const { data, error } = await supabase.auth.signUp({
@@ -41,19 +36,13 @@ export const registerUser = async (
 
   // Explicitly create affiliate record for new user
   // (DB trigger should handle this, but we ensure it exists as a fallback)
-  try {
-    const { createForAuthUser } =
-      await import("../affiliates/affiliate.repository");
-    await createForAuthUser(
-      data.user.id,
-      data.user.email!,
-      dto.fullName || data.user.email!.split("@")[0],
-    );
-    console.log("[Register] Affiliate record ensured for:", data.user.id);
-  } catch (err) {
-    // Don't fail registration if affiliate creation fails (trigger may have already created it)
-    console.warn("[Register] Affiliate auto-create skipped:", err);
-  }
+  const { createForAuthUser } =
+    await import("../affiliates/affiliate.repository");
+  await createForAuthUser(
+    data.user.id,
+    data.user.email!,
+    dto.fullName || data.user.email!.split("@")[0],
+  );
 
   // If a referral code was provided, link the new affiliate to the referrer
   if (dto.referralCode && data.user) {
@@ -95,48 +84,31 @@ async function linkReferral(
       findByStoreId,
     } = await import("../affiliates/affiliate.repository");
 
-    console.log("[Referral] Looking for referrer with code:", referralCode);
-
     // Try to find referrer by affiliate_link first, then store_id
     let referrer = await findByAffiliateLink(referralCode);
-    console.log("[Referral] findByAffiliateLink result:", referrer);
     if (!referrer) {
-      console.log("[Referral] Not found by affiliate_link, trying store_id");
       referrer = await findByStoreId(referralCode);
-      console.log("[Referral] findByStoreId result:", referrer);
     }
 
     if (!referrer) {
-      console.error("[Referral] Referrer not found for code:", referralCode);
       return;
     }
-
-    console.log("[Referral] Found referrer:", referrer.id, referrer.name);
 
     // Wait a bit for the affiliate record to be created (in case of async trigger)
     let newAffiliate = await findByUserId(newUserId);
     if (!newAffiliate) {
-      console.log("[Referral] Affiliate not found, waiting...");
       // Wait and retry
       await new Promise((resolve) => setTimeout(resolve, 500));
       newAffiliate = await findByUserId(newUserId);
     }
 
     if (!newAffiliate) {
-      console.error("[Referral] New affiliate not found for user:", newUserId);
       return;
     }
 
-    console.log(
-      "[Referral] Linking affiliate",
-      newAffiliate.id,
-      "to referrer",
-      referrer.id,
-    );
     await updateReferredBy(newAffiliate.id, referrer.id);
-    console.log("[Referral] Successfully linked!");
-  } catch (err) {
-    console.error("[Referral] Failed to link referral:", err);
+  } catch {
+    // Silently fail - referral linking is not critical
   }
 }
 
@@ -158,16 +130,12 @@ export const loginUser = async (dto: LoginDTO): Promise<AuthResponse> => {
 
   // Determine affiliate status so frontend can redirect correctly
   let affiliateStatus: "pending" | "active" | "suspended" = "pending";
-  try {
-    const { findByUserId } = await import("../affiliates/affiliate.repository");
-    const affiliate = await findByUserId(data.user.id);
-    if (affiliate) {
-      // If payment_status is unpaid, always treat as pending
-      affiliateStatus =
-        affiliate.payment_status === "paid" ? affiliate.status : "pending";
-    }
-  } catch (err) {
-    console.warn("[Login] Could not fetch affiliate status:", err);
+  const { findByUserId } = await import("../affiliates/affiliate.repository");
+  const affiliate = await findByUserId(data.user.id);
+  if (affiliate) {
+    // If payment_status is unpaid, always treat as pending
+    affiliateStatus =
+      affiliate.payment_status === "paid" ? affiliate.status : "pending";
   }
 
   return {
@@ -280,8 +248,6 @@ export const googleLogin = async (
   let user = existingUsers.users.find((u) => u.email === dto.email);
 
   if (!user) {
-    console.log("[Google Login] Creating new user:", dto.email);
-
     const { data: newUser, error: createError } =
       await supabaseAdmin.auth.admin.createUser({
         email: dto.email,
@@ -293,19 +259,6 @@ export const googleLogin = async (
       });
 
     if (createError || !newUser.user) {
-      console.error(
-        "[Google Login] Full error details:",
-        JSON.stringify(
-          {
-            message: createError?.message,
-            status: createError?.status,
-            code: createError?.code,
-            details: createError,
-          },
-          null,
-          2,
-        ),
-      );
       throw new AppError(
         createError?.message || "Failed to create Google user",
         500,
@@ -313,7 +266,6 @@ export const googleLogin = async (
     }
 
     user = newUser.user;
-    console.log("[Google Login] User created successfully:", user.id);
 
     // Explicitly create affiliate record for new Google user
     // (DB trigger may not fire for admin-created users)
@@ -325,10 +277,9 @@ export const googleLogin = async (
         user.email!,
         dto.fullName || user.email!.split("@")[0],
       );
-      console.log("[Google Login] Affiliate record created for:", user.id);
     } catch (err) {
       // Don't fail login if affiliate creation fails (trigger may have already created it)
-      console.warn("[Google Login] Affiliate auto-create skipped:", err);
+      console.warn("[googleLogin] Affiliate creation skipped:", err);
     }
 
     // Link referral if a referral code was provided (new user only)
@@ -375,8 +326,8 @@ export const googleLogin = async (
       affiliateStatus =
         affiliate.payment_status === "paid" ? affiliate.status : "pending";
     }
-  } catch (err) {
-    console.warn("[Google Login] Could not fetch affiliate status:", err);
+  } catch {
+    // Silent fail
   }
 
   return {
