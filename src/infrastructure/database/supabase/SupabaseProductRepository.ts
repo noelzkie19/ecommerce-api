@@ -1,0 +1,343 @@
+/**
+ * Supabase Product Repository
+ *
+ * Implements IProductRepository using Supabase as the data store.
+ * This is part of the infrastructure layer.
+ */
+
+import { supabaseAdmin } from "../../../config/supabase";
+import { AppError } from "../../../common/utils/AppError";
+import {
+  IProductRepository,
+  PaginatedResult,
+} from "../../../domain/interfaces/IProductRepository";
+import {
+  Product,
+  ProductFilters,
+  CreateProductProps,
+  UpdateProductProps,
+  ProductImage,
+  ProductImageDatabaseRow,
+} from "../../../domain/entities/Product";
+
+const db = supabaseAdmin as any;
+
+/**
+ * Supabase nested select for product_images, ordered by position
+ */
+const PRODUCT_WITH_IMAGES_SELECT = `
+  *,
+  images:product_images (
+    id,
+    product_id,
+    url,
+    position,
+    created_at
+  )
+` as const;
+
+/**
+ * Normalise raw Supabase row so images are always an array sorted by position
+ */
+function normaliseProduct(row: Record<string, unknown>) {
+  const images = Array.isArray(row.images) ? row.images : [];
+  return {
+    ...row,
+    images: [...images].sort(
+      (a: { position: number }, b: { position: number }) =>
+        a.position - b.position,
+    ),
+  };
+}
+
+/**
+ * Supabase implementation of IProductRepository
+ */
+export class SupabaseProductRepository implements IProductRepository {
+  /**
+   * Find all products with pagination and filters
+   */
+  async findAllPaginated(
+    page: number,
+    limit: number,
+    filters?: ProductFilters,
+  ): Promise<PaginatedResult<Product>> {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = db
+      .from("products")
+      .select(PRODUCT_WITH_IMAGES_SELECT, { count: "exact" })
+      .range(from, to)
+      .order("created_at", { ascending: false });
+
+    if (filters?.category) {
+      query = query.eq("category", filters.category);
+    }
+    if (filters?.search) {
+      query = query.ilike("name", `%${filters.search}%`);
+    }
+    if (filters?.minPrice !== undefined) {
+      query = query.gte("price", filters.minPrice);
+    }
+    if (filters?.maxPrice !== undefined) {
+      query = query.lte("price", filters.maxPrice);
+    }
+
+    const { data, error, count } = await query;
+    if (error) throw new AppError(error.message, 500);
+
+    const products = (data ?? []).map((row: Record<string, unknown>) =>
+      Product.fromDatabase(normaliseProduct(row) as any),
+    );
+
+    return {
+      data: products,
+      meta: {
+        total: count ?? 0,
+        page,
+        limit,
+        totalPages: Math.ceil((count ?? 0) / limit),
+      },
+    };
+  }
+
+  /**
+   * Find product by ID
+   */
+  async findById(id: string): Promise<Product | null> {
+    const { data, error } = await db
+      .from("products")
+      .select(PRODUCT_WITH_IMAGES_SELECT)
+      .eq("id", id)
+      .single();
+
+    if (error) return null;
+    return Product.fromDatabase(normaliseProduct(data) as any);
+  }
+
+  /**
+   * Find products by category
+   */
+  async findByCategory(category: string): Promise<Product[]> {
+    const { data, error } = await db
+      .from("products")
+      .select(PRODUCT_WITH_IMAGES_SELECT)
+      .eq("category", category)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new AppError(error.message, 500);
+
+    return (data ?? []).map((row: Record<string, unknown>) =>
+      Product.fromDatabase(normaliseProduct(row) as any),
+    );
+  }
+
+  /**
+   * Find products by search term
+   */
+  async findBySearch(search: string): Promise<Product[]> {
+    const { data, error } = await db
+      .from("products")
+      .select(PRODUCT_WITH_IMAGES_SELECT)
+      .ilike("name", `%${search}%`)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new AppError(error.message, 500);
+
+    return (data ?? []).map((row: Record<string, unknown>) =>
+      Product.fromDatabase(normaliseProduct(row) as any),
+    );
+  }
+
+  /**
+   * Find products by IDs (bulk)
+   */
+  async findByIds(ids: string[]): Promise<Product[]> {
+    if (ids.length === 0) return [];
+
+    const { data, error } = await db
+      .from("products")
+      .select(PRODUCT_WITH_IMAGES_SELECT)
+      .in("id", ids);
+
+    if (error) throw new AppError(error.message, 500);
+
+    return (data ?? []).map((row: Record<string, unknown>) =>
+      Product.fromDatabase(normaliseProduct(row) as any),
+    );
+  }
+
+  /**
+   * Get all unique categories
+   */
+  async getCategories(): Promise<string[]> {
+    const { data, error } = await db
+      .from("products")
+      .select("category")
+      .order("category");
+
+    if (error) throw new AppError(error.message, 500);
+
+    const categories = new Set<string>();
+    data?.forEach((row: { category: string }) => {
+      if (row.category) {
+        categories.add(row.category);
+      }
+    });
+
+    return Array.from(categories);
+  }
+
+  /**
+   * Create a new product
+   */
+  async create(props: CreateProductProps): Promise<Product> {
+    const payload = {
+      name: props.name,
+      description: props.description ?? null,
+      price: props.price,
+      category: props.category,
+      image_url: props.imageUrl ?? null,
+      badge: props.badge ?? null,
+      rating: props.rating ?? null,
+      review_count: props.reviewCount ?? null,
+      original_price: props.originalPrice ?? null,
+      affiliate_link: props.affiliateLink ?? null,
+    };
+
+    const { data, error } = await db
+      .from("products")
+      .insert(payload)
+      .select(PRODUCT_WITH_IMAGES_SELECT)
+      .single();
+
+    if (error) throw new AppError(error.message, 500);
+    return Product.fromDatabase(normaliseProduct(data) as any);
+  }
+
+  /**
+   * Update a product
+   */
+  async update(
+    id: string,
+    data: Partial<UpdateProductProps>,
+  ): Promise<Product> {
+    const payload = Object.fromEntries(
+      Object.entries({
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        category: data.category,
+        image_url: data.imageUrl,
+        badge: data.badge,
+        rating: data.rating,
+        review_count: data.reviewCount,
+        original_price: data.originalPrice,
+        affiliate_link: data.affiliateLink,
+      }).filter(([, v]) => v !== undefined),
+    );
+
+    const { data: updated, error } = await db
+      .from("products")
+      .update(payload)
+      .eq("id", id)
+      .select(PRODUCT_WITH_IMAGES_SELECT)
+      .single();
+
+    if (error) throw new AppError("Product not found", 404);
+    return Product.fromDatabase(normaliseProduct(updated) as any);
+  }
+
+  /**
+   * Delete a product
+   */
+  async delete(id: string): Promise<void> {
+    const { error } = await db.from("products").delete().eq("id", id);
+    if (error) throw new AppError("Product not found", 404);
+  }
+
+  /**
+   * Add images to a product
+   */
+  async addImages(
+    productId: string,
+    urls: string[],
+    startPosition: number = 0,
+  ): Promise<ProductImage[]> {
+    const maxPos = await this.getMaxImagePosition(productId);
+    const actualStart = startPosition > 0 ? startPosition : maxPos + 1;
+
+    const rows = urls.map((url, i) => ({
+      product_id: productId,
+      url,
+      position: actualStart + i,
+    }));
+
+    const { data, error } = await db
+      .from("product_images")
+      .insert(rows)
+      .select();
+
+    if (error) throw new AppError(error.message, 500);
+
+    return (data ?? []).map((row: ProductImageDatabaseRow) =>
+      ProductImage.fromDatabase(row),
+    );
+  }
+
+  /**
+   * Remove a single image
+   */
+  async removeImage(imageId: string): Promise<void> {
+    const { error } = await db
+      .from("product_images")
+      .delete()
+      .eq("id", imageId);
+
+    if (error) throw new AppError("Image not found", 404);
+  }
+
+  /**
+   * Remove all images for a product
+   */
+  async removeAllImages(productId: string): Promise<void> {
+    const { error } = await db
+      .from("product_images")
+      .delete()
+      .eq("product_id", productId);
+
+    if (error) throw new AppError(error.message, 500);
+  }
+
+  /**
+   * Reorder images
+   */
+  async reorderImages(
+    images: { id: string; position: number }[],
+  ): Promise<void> {
+    await Promise.all(
+      images.map(({ id, position }) =>
+        db.from("product_images").update({ position }).eq("id", id),
+      ),
+    );
+  }
+
+  /**
+   * Get the maximum image position for a product
+   */
+  async getMaxImagePosition(productId: string): Promise<number> {
+    const { data } = await db
+      .from("product_images")
+      .select("position")
+      .eq("product_id", productId)
+      .order("position", { ascending: false })
+      .limit(1)
+      .single();
+
+    return (data as { position: number } | null)?.position ?? -1;
+  }
+}
+
+// Export singleton instance
+export const productRepository = new SupabaseProductRepository();
