@@ -1,7 +1,19 @@
+/**
+ * Products Admin Controller
+ *
+ * Handles admin product management endpoints.
+ */
+
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
-import * as productsService from "./products.service";
+import {
+  ListProductsUseCase,
+  CreateProductUseCase,
+  UpdateProductUseCase,
+  DeleteProductUseCase,
+  ManageProductImagesUseCase,
+} from "../../application/use-cases/product";
 
 // ---------------------------------------------------------------------------
 // Products
@@ -19,18 +31,21 @@ export const getProducts = catchAsync(
       Math.max(1, Number.parseInt(req.query.limit as string) || 10),
     );
 
-    const result = await productsService.getProductsPaginated(
-      { category, search },
+    const useCase = new ListProductsUseCase();
+    const result = await useCase.execute({
       page,
       limit,
-    );
-    res.json({ success: true, data: result.data, meta: result.meta });
+      filters: { category, search },
+    });
+
+    res.json({ success: true, data: result.products, meta: result.meta });
   },
 );
 
 export const createProduct = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const product = await productsService.createProduct(req.body);
+    const useCase = new CreateProductUseCase();
+    const product = await useCase.execute(req.body);
     res.status(201).json({ success: true, data: product });
   },
 );
@@ -38,7 +53,8 @@ export const createProduct = catchAsync(
 export const updateProduct = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id);
-    const product = await productsService.updateProduct(id, req.body);
+    const useCase = new UpdateProductUseCase();
+    const product = await useCase.execute({ productId: id, ...req.body });
     sendSuccess(res, product);
   },
 );
@@ -46,7 +62,8 @@ export const updateProduct = catchAsync(
 export const deleteProduct = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id);
-    await productsService.deleteProduct(id);
+    const useCase = new DeleteProductUseCase();
+    await useCase.execute({ productId: id });
     res.status(204).send();
   },
 );
@@ -72,7 +89,8 @@ export const addProductImages = catchAsync(
       return;
     }
 
-    const images = await productsService.addProductImages(productId, urls);
+    const useCase = new ManageProductImagesUseCase();
+    const images = await useCase.addImages({ productId, urls });
     res.status(201).json({ success: true, data: images });
   },
 );
@@ -94,7 +112,8 @@ export const replaceProductImages = catchAsync(
       return;
     }
 
-    const images = await productsService.replaceProductImages(productId, urls);
+    const useCase = new ManageProductImagesUseCase();
+    const images = await useCase.replaceImages({ productId, urls });
     res.status(200).json({ success: true, data: images });
   },
 );
@@ -116,7 +135,8 @@ export const reorderProductImages = catchAsync(
       return;
     }
 
-    await productsService.reorderProductImages(images);
+    const useCase = new ManageProductImagesUseCase();
+    await useCase.reorderImages({ images });
     res.status(200).json({ success: true });
   },
 );
@@ -128,7 +148,8 @@ export const reorderProductImages = catchAsync(
 export const deleteProductImage = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const imageId = String(req.params.imageId);
-    await productsService.deleteProductImage(imageId);
+    const useCase = new ManageProductImagesUseCase();
+    await useCase.removeImage({ imageId });
     res.status(204).send();
   },
 );

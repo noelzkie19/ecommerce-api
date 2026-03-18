@@ -7,7 +7,7 @@ import {
   AffiliateStatus,
 } from "./affiliate.types";
 
-const db = supabaseAdmin as any; // remove once supabase types are regenerated
+const db = supabaseAdmin as any;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

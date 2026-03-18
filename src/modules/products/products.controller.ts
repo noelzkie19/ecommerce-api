@@ -1,7 +1,16 @@
+/**
+ * Products Public Controller
+ *
+ * Handles public product endpoints.
+ */
+
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
-import * as productsService from "./products.service";
+import {
+  ListProductsUseCase,
+  GetProductUseCase,
+} from "../../application/use-cases/product";
 
 export const getProducts = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
@@ -15,19 +24,28 @@ export const getProducts = catchAsync(
       Math.max(1, Number.parseInt(req.query.limit as string) || 10),
     );
 
-    const result = await productsService.getProductsPaginated(
-      { category, search },
+    const useCase = new ListProductsUseCase();
+    const result = await useCase.execute({
       page,
       limit,
-    );
-    res.json({ success: true, data: result.data, meta: result.meta });
+      filters: { category, search },
+    });
+
+    res.json({ success: true, data: result.products, meta: result.meta });
   },
 );
 
 export const getProductById = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const id = String(req.params.id);
-    const product = await productsService.getProductById(id);
+    const useCase = new GetProductUseCase();
+    const product = await useCase.execute({ productId: id });
+
+    if (!product) {
+      res.status(404).json({ success: false, message: "Product not found" });
+      return;
+    }
+
     sendSuccess(res, product);
   },
 );
