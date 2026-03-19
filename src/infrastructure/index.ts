@@ -22,3 +22,10 @@ export {
   SupabaseCourseRepository,
   courseRepository,
 } from "./database/supabase/SupabaseCourseRepository";
+
+export { SupabaseCommunityLinkRepository } from "./database/supabase/SupabaseCommunityLinkRepository";
+
+export {
+  SupabaseImageLibraryRepository,
+  imageLibraryRepository,
+} from "./database/supabase/SupabaseImageLibraryRepository";

@@ -76,3 +76,15 @@ export {
   type CommunityLinkResponse,
   type CommunityLinkPublicResponse,
 } from "./CommunityLink";
+
+// Image Library exports
+export {
+  ImageLibrary,
+  type ImageLibraryCategory,
+  type ImageLibraryProps,
+  type CreateImageLibraryProps,
+  type UpdateImageLibraryProps,
+  type ImageLibraryDB,
+  type ImageLibraryResponse,
+  type ImageLibraryPublicResponse,
+} from "./ImageLibrary";

@@ -28,6 +28,11 @@ export type {
   PaginatedCommunityLinks,
 } from "./ICommunityLinkRepository";
 export type {
+  IImageLibraryRepository,
+  ImageLibraryFilters,
+  PaginatedImageLibraries,
+} from "./IImageLibraryRepository";
+export type {
   PaginatedResult,
   AffiliateProduct,
   AffiliateSettings,

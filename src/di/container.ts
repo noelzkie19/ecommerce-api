@@ -11,6 +11,7 @@ import { SupabaseProductRepository } from "../infrastructure/database/supabase/S
 import { SupabaseCourseRepository } from "../infrastructure/database/supabase/SupabaseCourseRepository";
 import { SupabaseAuthRepository } from "../infrastructure/database/supabase/SupabaseAuthRepository";
 import { SupabaseCommunityLinkRepository } from "../infrastructure/database/supabase/SupabaseCommunityLinkRepository";
+import { SupabaseImageLibraryRepository } from "../infrastructure/database/supabase/SupabaseImageLibraryRepository";
 
 /**
  * Dependency Container
@@ -55,6 +56,10 @@ class Container {
     this.dependencies.set(
       "ICommunityLinkRepository",
       new SupabaseCommunityLinkRepository(),
+    );
+    this.dependencies.set(
+      "IImageLibraryRepository",
+      new SupabaseImageLibraryRepository(),
     );
   }
 
@@ -109,4 +114,5 @@ export const TOKENS = {
   ICourseRepository: "ICourseRepository",
   IAuthRepository: "IAuthRepository",
   ICommunityLinkRepository: "ICommunityLinkRepository",
+  IImageLibraryRepository: "IImageLibraryRepository",
 } as const;
