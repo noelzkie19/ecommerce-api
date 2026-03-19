@@ -26,6 +26,7 @@ import affiliateSalesRoutes from "./modules/affiliates-sales/affiliate-sales.rou
 import affiliateTrackingRoutes from "./modules/affiliate-tracking/affiliate-tracking.routes";
 import affiliatePixelRoutes from "./modules/affiliate-pixel/affiliate-pixel.routes";
 import communityLinksRoutes from "./modules/community-links/community-links.routes";
+import imageLibraryRoutes from "./modules/image-library/image-library.routes";
 
 const app: Application = express();
 
@@ -97,6 +98,7 @@ app.use("/api/affiliate-pixel", affiliatePixelRoutes);
 app.use("/api/testimonials", testimonialsRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/community-links", communityLinksRoutes);
+app.use("/api", imageLibraryRoutes);
 
 // ── Health Check ──────────────────────────────────────────────
 app.get("/health", (_req, res) => {
