@@ -35,3 +35,20 @@ export {
   DeleteImageLibraryUseCase,
   type DeleteImageLibraryInput,
 } from "./DeleteImageLibrary";
+
+// Upload
+export {
+  uploadImage,
+  type UploadImageInput,
+  type UploadImageOutput,
+} from "./UploadImage";
+export {
+  uploadThumbnail,
+  type UploadThumbnailInput,
+  type UploadThumbnailOutput,
+} from "./UploadThumbnail";
+export {
+  uploadImageAndThumbnail,
+  type UploadImageAndThumbnailInput,
+  type UploadImageAndThumbnailOutput,
+} from "./UploadImageAndThumbnail";
