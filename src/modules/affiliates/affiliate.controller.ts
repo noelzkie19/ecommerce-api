@@ -233,6 +233,7 @@ export const getMyAffiliateStatus = catchAsync(
         ? `${process.env.FRONTEND_URL || "http://localhost:5173"}/register?ref=${linkCode}`
         : null,
       affiliateLinkCode: linkCode,
+      affiliateCommission: affiliate.affiliateCommission ?? 0,
       createdAt: affiliate.createdAt,
     });
   },
