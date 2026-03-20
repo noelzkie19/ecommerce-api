@@ -98,23 +98,16 @@ export interface AttributionData {
   referrerUrl?: string;
 }
 
-// ── Pagination ───────────────────────────────────────────────────────────────
-
-export interface PaginationMeta {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+// ── Paginated Types ───────────────────────────────────────────────────────────
 
 export interface PaginatedTrackingLinks {
   data: AffiliateTrackingLink[];
-  meta: PaginationMeta;
+  meta: import("../../common/types").PaginationMeta;
 }
 
 export interface PaginatedAttributions {
   data: AffiliateAttribution[];
-  meta: PaginationMeta;
+  meta: import("../../common/types").PaginationMeta;
 }
 
 // ── Cookie Data ───────────────────────────────────────────────────────────────

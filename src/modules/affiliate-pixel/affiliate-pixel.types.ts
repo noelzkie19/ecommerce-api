@@ -117,40 +117,9 @@ export interface AffiliatePixelEvent {
   };
 }
 
-// ── DTOs ─────────────────────────────────────────────────────────────────
-
-export interface UpdatePixelConfigDTO {
-  pixelId?: string;
-  pixelAccessToken?: string;
-  enablePurchaseEvent?: boolean;
-  enableLeadEvent?: boolean;
-  conversionValueType?: ConversionValueType;
-  conversionValueFixed?: number;
-}
-
-export interface TestPixelConfigDTO {
-  pixelId: string;
-  testEventCode?: string;
-}
-
-export interface PixelEventResult {
-  success: boolean;
-  eventId: string;
-  pixelId: string;
-  response?: MetaConversionsApiResponse;
-  error?: string;
-}
-
-// ── Pagination ─────────────────────────────────────────────────────────────
-
-export interface PaginationMeta {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+// ── Paginated Types ───────────────────────────────────────────────────────
 
 export interface PaginatedPixelEvents {
   data: AffiliatePixelEvent[];
-  meta: PaginationMeta;
+  meta: import("../../common/types").PaginationMeta;
 }

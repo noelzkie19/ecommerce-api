@@ -1,15 +1,23 @@
-export type PaymentMethod = "cod" | "gcash" | "card";
+// Import types from domain for local use
+import type {
+  PaymentMethod,
+  OrderStatus,
+  PaymentStatus,
+} from "../../domain/entities/Order";
 
-export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "processing"
-  | "shipped"
-  | "delivered"
-  | "cancelled";
+// Re-export from domain
+export type {
+  PaymentMethod,
+  OrderStatus,
+  PaymentStatus,
+} from "../../domain/entities/Order";
 
-export type PaymentStatus = "pending" | "paid" | "failed";
+// Also export using module-specific names for backwards compatibility
+export type { PaymentMethod as OrderPaymentMethod } from "../../domain/entities/Order";
+export type { OrderStatus as OrderOrderStatus } from "../../domain/entities/Order";
+export type { PaymentStatus as OrderPaymentStatus } from "../../domain/entities/Order";
 
+// DTOs
 export interface CreateOrderDTO {
   fullName: string;
   email: string;
@@ -24,6 +32,7 @@ export interface UpdateOrderStatusDTO {
   status: OrderStatus;
 }
 
+// Order with items (includes joined product data - not in domain)
 export interface OrderItem {
   id: string;
   orderId: string;
@@ -59,7 +68,13 @@ export interface Order {
   items: OrderItem[];
 }
 
-export interface PaginationMeta {
+// Import PaginationMeta from common types
+// Re-export for convenience
+export type { PaginationMeta } from "../../common/types";
+
+// For backwards compatibility - can be removed once all imports are updated
+// eslint-disable-next-line no-shadow
+interface PaginationMeta {
   total: number;
   page: number;
   limit: number;

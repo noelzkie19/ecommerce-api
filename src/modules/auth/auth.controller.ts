@@ -1,8 +1,26 @@
+/**
+ * Auth Controller
+ *
+ * Handles HTTP requests for authentication endpoints.
+ */
+
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
 import { AppError } from "../../common/utils/AppError";
-import * as authService from "./auth.service";
+
+import {
+  RegisterUserUseCase,
+  LoginUserUseCase,
+  LogoutUserUseCase,
+  RefreshSessionUseCase,
+  ForgotPasswordUseCase,
+  ResetPasswordUseCase,
+  GoogleLoginUseCase,
+  AdminLogoutUseCase,
+  ListUsersUseCase,
+} from "../../application/use-cases/auth";
+
 import {
   RegisterInput,
   LoginInput,
@@ -17,7 +35,10 @@ import {
 export const register = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const dto = req.body as RegisterInput;
-    const result = await authService.registerUser(dto);
+
+    const useCase = new RegisterUserUseCase();
+    const result = await useCase.execute(dto);
+
     sendSuccess(res, result, "Account created successfully", 201);
   },
 );
@@ -28,7 +49,10 @@ export const register = catchAsync(
 export const login = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const dto = req.body as LoginInput;
-    const result = await authService.loginUser(dto);
+
+    const useCase = new LoginUserUseCase();
+    const result = await useCase.execute(dto);
+
     sendSuccess(res, result, "Login successful");
   },
 );
@@ -42,7 +66,10 @@ export const refresh = catchAsync(
     if (!refreshToken) {
       throw new AppError("Refresh token is required", 400);
     }
-    const result = await authService.refreshSession(refreshToken);
+
+    const useCase = new RefreshSessionUseCase();
+    const result = await useCase.execute({ refreshToken });
+
     sendSuccess(res, result, "Token refreshed");
   },
 );
@@ -53,7 +80,10 @@ export const refresh = catchAsync(
 export const forgotPassword = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const dto = req.body as ForgotPasswordInput;
-    await authService.forgotPassword(dto);
+
+    const useCase = new ForgotPasswordUseCase();
+    await useCase.execute(dto);
+
     sendSuccess(res, null, "If the email exists, a reset link has been sent");
   },
 );
@@ -71,7 +101,10 @@ export const resetPassword = catchAsync(
       ? authHeader[0].split(" ")[1]
       : authHeader.split(" ")[1];
     const dto = req.body as ResetPasswordInput;
-    await authService.resetPassword(token, dto);
+
+    const useCase = new ResetPasswordUseCase();
+    await useCase.execute({ accessToken: token, password: dto.password });
+
     sendSuccess(res, null, "Password reset successfully");
   },
 );
@@ -81,7 +114,9 @@ export const resetPassword = catchAsync(
 ───────────────────────────────────────────── */
 export const logout = catchAsync(
   async (_req: Request, res: Response): Promise<void> => {
-    await authService.logoutUser();
+    const useCase = new LogoutUserUseCase();
+    await useCase.execute();
+
     sendSuccess(res, null, "Logged out successfully");
   },
 );
@@ -95,7 +130,10 @@ export const adminLogout = catchAsync(
     if (!userId) {
       throw new AppError("User ID is required", 400);
     }
-    await authService.adminLogoutUser(userId);
+
+    const useCase = new AdminLogoutUseCase();
+    await useCase.execute({ userId });
+
     sendSuccess(res, null, "User sessions invalidated successfully");
   },
 );
@@ -106,7 +144,10 @@ export const adminLogout = catchAsync(
 export const googleLogin = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const dto = req.body as GoogleLoginInput;
-    const result = await authService.googleLogin(dto);
+
+    const useCase = new GoogleLoginUseCase();
+    const result = await useCase.execute(dto);
+
     sendSuccess(res, result, "Google login successful");
   },
 );
@@ -137,7 +178,9 @@ export const me = catchAsync(
 ───────────────────────────────────────────── */
 export const getAuthUsers = catchAsync(
   async (_req: Request, res: Response): Promise<void> => {
-    const users = await authService.getAuthUsers();
+    const useCase = new ListUsersUseCase();
+    const users = await useCase.execute();
+
     sendSuccess(res, users, "Auth users fetched successfully");
   },
 );

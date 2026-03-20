@@ -5,13 +5,13 @@ import * as paymongoUtils from "../../utils/paymongo.utils";
 import { CartOwner } from "../cart/cart.types";
 import { CreateOrderDTO, OrderStatus, PlaceOrderResult } from "./order.types";
 import { AppError } from "../../common/utils/AppError";
-import * as affiliateSalesService from "../affiliates-sales/affiliate-sales.service";
+import * as affiliateSalesService from "../affiliates-sales/affiliate-sales.repository";
 import {
   activateAffiliateByUserId,
   markAffiliateAsPaidByUserId,
 } from "../affiliates/affiliate.service";
-import * as trackingService from "../affiliate-tracking/affiliate-tracking.service";
-import * as pixelService from "../affiliate-pixel/affiliate-pixel.service";
+import { attributeOrderFromData } from "../../application/use-cases/affiliate-tracking";
+import { firePurchaseEvent } from "../../application/use-cases/affiliate-pixel";
 import { supabaseAdmin } from "../../config/supabase";
 
 // ── Place Order ───────────────────────────────────────────────────────────────
@@ -89,7 +89,8 @@ export const placeOrder = async (
   // Create attribution record if affiliate is specified
   if (attributionData?.affiliateId) {
     try {
-      await trackingService.attributeOrderFromData(order.id, {
+      await attributeOrderFromData({
+        orderId: order.id,
         affiliateId: attributionData.affiliateId,
         pixelId: attributionData.pixelId,
         storeId: attributionData.storeId,
@@ -206,10 +207,10 @@ export const verifyGCashPayment = async (intentId: string) => {
     const orderWithAffiliate = order as any;
     if (orderWithAffiliate.affiliate_id) {
       try {
-        await pixelService.firePurchaseEvent(
-          order.id,
-          orderWithAffiliate.affiliate_id,
-        );
+        await firePurchaseEvent({
+          orderId: order.id,
+          affiliateId: orderWithAffiliate.affiliate_id,
+        });
       } catch {
         // Silent fail
       }
@@ -255,7 +256,10 @@ export const updateOrderStatus = async (id: string, status: OrderStatus) => {
     const order = await orderRepository.findOrderById(id);
     if (order?.affiliate_id) {
       try {
-        await pixelService.firePurchaseEvent(id, order.affiliate_id);
+        await firePurchaseEvent({
+          orderId: id,
+          affiliateId: order.affiliate_id,
+        });
       } catch (err) {
         // Non-critical — pixel firing should not block order confirmation
         console.warn(
