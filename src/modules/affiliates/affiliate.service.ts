@@ -241,10 +241,8 @@ async function fireAffiliateRegistrationPixel(
   storeId: string | undefined,
 ): Promise<void> {
   try {
-    const { buildLeadEvent } =
+    const { buildLeadEvent, sendPixelEvent } =
       await import("../affiliate-pixel/affiliate-pixel.utils");
-    const { sendPixelEvent } =
-      await import("../affiliate-pixel/affiliate-pixel.service");
 
     const event = buildLeadEvent({
       leadId: userId,

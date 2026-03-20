@@ -1,7 +1,11 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
-import * as trackingService from "./affiliate-tracking.service";
+import * as useCases from "../../application/use-cases/affiliate-tracking";
+import {
+  getAffiliateCookieName,
+  getCookieOptions,
+} from "./affiliate-tracking.utils";
 
 // ── Tracking Links ───────────────────────────────────────────────────────────
 
@@ -10,7 +14,7 @@ export const generateTrackingLink = catchAsync(
     const { affiliateId, storeId, campaignName, landingPageUrl, expiresAt } =
       req.body;
 
-    const link = await trackingService.generateTrackingLink({
+    const link = await useCases.generateTrackingLink({
       affiliateId,
       storeId,
       campaignName,
@@ -28,11 +32,11 @@ export const getTrackingLinks = catchAsync(
     const page = req.query.page as string | undefined;
     const limit = req.query.limit as string | undefined;
 
-    const result = await trackingService.getTrackingLinks(
-      id,
-      page ? Number.parseInt(page, 10) : 1,
-      limit ? Number.parseInt(limit, 10) : 20,
-    );
+    const result = await useCases.getTrackingLinks({
+      affiliateId: id,
+      page: page ? Number.parseInt(page, 10) : undefined,
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+    });
 
     sendSuccess(res, result);
   },
@@ -41,7 +45,7 @@ export const getTrackingLinks = catchAsync(
 export const getTrackingLink = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const id = req.params.id as string;
-    const link = await trackingService.getTrackingLink(id);
+    const link = await useCases.getTrackingLink({ id });
     sendSuccess(res, link);
   },
 );
@@ -51,7 +55,8 @@ export const updateTrackingLink = catchAsync(
     const id = req.params.id as string;
     const { campaignName, landingPageUrl, expiresAt, isActive } = req.body;
 
-    const link = await trackingService.updateTrackingLink(id, {
+    const link = await useCases.updateTrackingLink({
+      id,
       campaignName,
       landingPageUrl,
       expiresAt,
@@ -65,7 +70,7 @@ export const updateTrackingLink = catchAsync(
 export const deleteTrackingLink = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const id = req.params.id as string;
-    await trackingService.deleteTrackingLink(id);
+    await useCases.deleteTrackingLink({ id });
     res.status(204).send();
   },
 );
@@ -75,7 +80,7 @@ export const deleteTrackingLink = catchAsync(
 export const getAttributionByOrder = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const orderId = req.params.orderId as string;
-    const attribution = await trackingService.getAttributionByOrder(orderId);
+    const attribution = await useCases.getAttributionByOrder({ orderId });
     sendSuccess(res, attribution);
   },
 );
@@ -85,15 +90,11 @@ export const attributeOrder = catchAsync(
     const orderId = req.params.orderId as string;
     const { affiliateId, clickId } = req.body;
 
-    const attribution = await trackingService.attributeOrder(
-      {
-        orderId,
-        affiliateId,
-        trackingMethod: "manual",
-        clickId,
-      },
-      { affiliateId, trackingMethod: "manual" },
-    );
+    const attribution = await useCases.attributeOrder({
+      orderId,
+      affiliateId,
+      clickId,
+    });
 
     sendSuccess(res, attribution, "Order attributed to affiliate", 201);
   },
@@ -105,11 +106,11 @@ export const getAttributions = catchAsync(
     const page = req.query.page as string | undefined;
     const limit = req.query.limit as string | undefined;
 
-    const result = await trackingService.getAttributionsByAffiliate(
-      id,
-      page ? Number.parseInt(page, 10) : 1,
-      limit ? Number.parseInt(limit, 10) : 20,
-    );
+    const result = await useCases.getAttributions({
+      affiliateId: id,
+      page: page ? Number.parseInt(page, 10) : undefined,
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+    });
 
     sendSuccess(res, result);
   },
@@ -123,11 +124,11 @@ export const getTrackingStats = catchAsync(
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
 
-    const stats = await trackingService.getTrackingStats(
-      id,
+    const stats = await useCases.getTrackingStats({
+      affiliateId: id,
       startDate,
       endDate,
-    );
+    });
 
     sendSuccess(res, stats);
   },
@@ -137,8 +138,8 @@ export const getTrackingStats = catchAsync(
 
 export const getCookieConfig = catchAsync(
   async (_req: Request, res: Response): Promise<void> => {
-    const cookieName = trackingService.getAffiliateCookieName();
-    const cookieOptions = trackingService.getCookieOptions();
+    const cookieName = getAffiliateCookieName();
+    const cookieOptions = getCookieOptions();
 
     sendSuccess(res, {
       cookieName,
@@ -160,7 +161,7 @@ export const resolveRef = catchAsync(
       return;
     }
 
-    const result = await trackingService.resolveRef(ref);
+    const result = await useCases.resolveRef({ storeId: ref });
 
     if (!result) {
       res

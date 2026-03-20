@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import * as trackingService from "../../modules/affiliate-tracking/affiliate-tracking.service";
+import {
+  getAttributionFromCookie,
+  getAttributionFromUrl,
+  mergeAttribution,
+} from "../../modules/affiliate-tracking/affiliate-tracking.utils";
 
 /**
  * Middleware to extract and attach affiliate attribution data to the request
@@ -17,7 +21,7 @@ export const affiliateTrackingMiddleware = (
 ): void => {
   try {
     // Get attribution from URL query parameters
-    const urlAttribution = trackingService.getAttributionFromUrl(
+    const urlAttribution = getAttributionFromUrl(
       req.query as Record<string, string>,
     );
 
@@ -25,11 +29,11 @@ export const affiliateTrackingMiddleware = (
     const cookieValue =
       req.cookies?.aft || (req.headers["x-affiliate-cookie"] as string);
     const cookieAttribution = cookieValue
-      ? trackingService.getAttributionFromCookie(cookieValue)
+      ? getAttributionFromCookie(cookieValue)
       : null;
 
     // Merge attributions (URL takes precedence over cookie)
-    const mergedAttribution = trackingService.mergeAttribution(
+    const mergedAttribution = mergeAttribution(
       cookieAttribution,
       urlAttribution,
     );

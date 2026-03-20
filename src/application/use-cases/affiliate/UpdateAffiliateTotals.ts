@@ -1,7 +1,7 @@
 /**
  * Update Affiliate Totals Use Case
  *
- * Updates an affiliate's sales and commissions totals.
+ * Updates an affiliate's total sales and commissions.
  */
 
 import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
@@ -32,10 +32,19 @@ export class UpdateAffiliateTotalsUseCase {
    * Execute the use case
    */
   async execute(input: UpdateAffiliateTotalsInput): Promise<void> {
-    await this.affiliateRepository.updateTotals(
-      input.affiliateId,
-      input.saleAmount,
-      input.commissionEarned,
-    );
+    const { affiliateId, saleAmount, commissionEarned } = input;
+
+    const affiliate = await this.affiliateRepository.findById(affiliateId);
+    if (!affiliate) {
+      throw new Error("Affiliate not found");
+    }
+
+    const newTotalSales = affiliate.totalSales + saleAmount;
+    const newTotalCommissions = affiliate.totalCommissions + commissionEarned;
+
+    await this.affiliateRepository.update(affiliateId, {
+      totalSales: newTotalSales,
+      totalCommissions: newTotalCommissions,
+    });
   }
 }

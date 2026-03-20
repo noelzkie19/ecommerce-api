@@ -1,8 +1,20 @@
+/**
+ * Affiliate Sales Controller
+ *
+ * Handles HTTP requests for affiliate sales endpoints.
+ */
+
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
 import { AppError } from "../../common/utils/AppError";
-import * as salesService from "./affiliate-sales.service";
+import {
+  ListAffiliateSalesUseCase,
+  GetAffiliateSaleUseCase,
+  UpdateAffiliateSaleStatusUseCase,
+  ApproveAffiliateSaleUseCase,
+  RejectAffiliateSaleUseCase,
+} from "../../application/use-cases/affiliate-sales";
 import { AffiliateSaleStatus } from "./affiliate-sales.types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -26,13 +38,15 @@ export const getSales = catchAsync(async (req: Request, res: Response) => {
     | AffiliateSaleStatus
     | undefined;
 
-  const result = await salesService.getSales(
+  const useCase = new ListAffiliateSalesUseCase();
+  const result = await useCase.execute({
     page,
     limit,
     affiliateId,
     status,
     search,
-  );
+  });
+
   sendSuccess(res, result);
 });
 
@@ -40,7 +54,8 @@ export const getSales = catchAsync(async (req: Request, res: Response) => {
 
 export const getSale = catchAsync(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const sale = await salesService.getSale(id);
+  const useCase = new GetAffiliateSaleUseCase();
+  const sale = await useCase.execute({ id });
   sendSuccess(res, sale);
 });
 
@@ -50,11 +65,20 @@ export const updateSaleStatus = catchAsync(
   async (req: Request, res: Response) => {
     const id = String(req.params.id);
     const { status } = req.body;
+
     if (!status) throw new AppError("Status is required", 400);
-    const sale = await salesService.updateSaleStatus(
-      id,
-      status as AffiliateSaleStatus,
-    );
+
+    const VALID = new Set<AffiliateSaleStatus>([
+      "pending",
+      "approved",
+      "rejected",
+    ]);
+    if (!VALID.has(status)) throw new AppError("Invalid status", 400);
+
+    const useCase = new UpdateAffiliateSaleStatusUseCase();
+    const sale = await useCase.execute({ id, status });
+
+    // If approving, update affiliate totals via the use case (handled internally)
     sendSuccess(res, sale, "Sale status updated");
   },
 );
@@ -63,7 +87,8 @@ export const updateSaleStatus = catchAsync(
 
 export const approveSale = catchAsync(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const sale = await salesService.approveSale(id);
+  const useCase = new ApproveAffiliateSaleUseCase();
+  const sale = await useCase.execute({ id });
   sendSuccess(res, sale, "Sale approved");
 });
 
@@ -71,7 +96,8 @@ export const approveSale = catchAsync(async (req: Request, res: Response) => {
 
 export const rejectSale = catchAsync(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  const sale = await salesService.rejectSale(id);
+  const useCase = new RejectAffiliateSaleUseCase();
+  const sale = await useCase.execute({ id });
   sendSuccess(res, sale, "Sale rejected");
 });
 
@@ -79,6 +105,10 @@ export const rejectSale = catchAsync(async (req: Request, res: Response) => {
 
 export const deleteSale = catchAsync(async (req: Request, res: Response) => {
   const id = String(req.params.id);
-  await salesService.deleteSale(id);
+
+  // Dynamic import to avoid circular dependencies
+  const { remove } = await import("./affiliate-sales.repository");
+  await remove(id);
+
   res.status(204).send();
 });

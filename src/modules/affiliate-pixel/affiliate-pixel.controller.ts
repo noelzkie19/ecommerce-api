@@ -1,14 +1,14 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
-import * as pixelService from "./affiliate-pixel.service";
+import * as useCases from "../../application/use-cases/affiliate-pixel";
 
 // ── Pixel Configuration ─────────────────────────────────────────────────
 
 export const getPixelConfig = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const id = req.params.id as string;
-    const config = await pixelService.getAffiliatePixelConfig(id);
+    const config = await useCases.getAffiliatePixelConfig({ affiliateId: id });
     sendSuccess(res, config);
   },
 );
@@ -25,7 +25,8 @@ export const updatePixelConfig = catchAsync(
       conversionValueFixed,
     } = req.body;
 
-    const config = await pixelService.updateAffiliatePixelConfig(id, {
+    const config = await useCases.updateAffiliatePixelConfig({
+      affiliateId: id,
       pixelId,
       pixelAccessToken,
       enablePurchaseEvent,
@@ -42,7 +43,7 @@ export const testPixelConfig = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { pixelId, testEventCode } = req.body;
 
-    const result = await pixelService.testPixelConfig(pixelId, testEventCode);
+    const result = await useCases.testPixelConfig({ pixelId, testEventCode });
 
     if (result.success) {
       sendSuccess(res, result, "Test event sent successfully");
@@ -60,11 +61,11 @@ export const getPixelEvents = catchAsync(
     const page = req.query.page as string | undefined;
     const limit = req.query.limit as string | undefined;
 
-    const result = await pixelService.getPixelEvents(
-      id,
-      page ? Number.parseInt(page, 10) : 1,
-      limit ? Number.parseInt(limit, 10) : 20,
-    );
+    const result = await useCases.getPixelEvents({
+      affiliateId: id,
+      page: page ? Number.parseInt(page, 10) : undefined,
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+    });
 
     sendSuccess(res, result);
   },
@@ -74,7 +75,7 @@ export const firePurchaseEvent = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { orderId, affiliateId } = req.body;
 
-    const result = await pixelService.firePurchaseEvent(orderId, affiliateId);
+    const result = await useCases.firePurchaseEvent({ orderId, affiliateId });
 
     if (result.success) {
       sendSuccess(res, result, "Purchase event fired successfully");
@@ -93,7 +94,7 @@ export const fireLeadEvent = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { orderId, affiliateId } = req.body;
 
-    const result = await pixelService.fireLeadEvent(orderId, affiliateId);
+    const result = await useCases.fireLeadEvent({ orderId, affiliateId });
 
     if (result.success) {
       sendSuccess(res, result, "Lead event fired successfully");
@@ -116,7 +117,7 @@ export const retryFailedEvents = catchAsync(
       ? Number.parseInt(req.query.limit as string, 10)
       : 10;
 
-    await pixelService.retryFailedEvents(limit);
-    sendSuccess(res, { retryCount: limit }, "Failed events retry completed");
+    const result = await useCases.retryFailedEvents({ limit });
+    sendSuccess(res, result, "Failed events retry completed");
   },
 );

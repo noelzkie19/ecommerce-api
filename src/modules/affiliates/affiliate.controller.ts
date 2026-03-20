@@ -1,14 +1,37 @@
+/**
+ * Affiliate Controller
+ *
+ * Handles HTTP requests for affiliate endpoints.
+ */
+
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
 import { AppError } from "../../common/utils/AppError";
-import * as affiliateService from "./affiliate.service";
 import { env } from "../../config/env";
 
-const buildStoreUrl = (storeId: string | null | undefined): string | null => {
-  if (!storeId) return null;
-  return `${env.FRONTEND_URL}?ref=${storeId}`;
-};
+import {
+  ListAffiliatesUseCase,
+  GetAffiliateUseCase,
+  CreateAffiliateUseCase,
+  UpdateAffiliateUseCase,
+  DeleteAffiliateUseCase,
+  SuspendAffiliateUseCase,
+  ActivateAffiliateUseCase,
+  GetAffiliateProductsUseCase,
+  AssignProductUseCase,
+  RemoveProductUseCase,
+  GenerateAffiliateLinkUseCase,
+  GetAffiliateByUserIdUseCase,
+  UpdateMyPixelIdUseCase,
+  CreateAffiliatePaymentUseCase,
+  VerifyAffiliatePaymentUseCase,
+  GetAffiliateSettingsUseCase,
+  UpdateAffiliateSettingsUseCase,
+  SetAffiliateReferrerUseCase,
+  RecordReferralCommissionUseCase,
+  AddCommissionByReferralCodeUseCase,
+} from "../../application/use-cases/affiliate";
 
 import {
   validateCreateAffiliate,
@@ -19,6 +42,11 @@ import {
   validateAffiliatePaginatedQuery,
 } from "../../common/validators/affiliate.validator";
 
+const buildStoreUrl = (storeId: string | null | undefined): string | null => {
+  if (!storeId) return null;
+  return `${env.FRONTEND_URL}?ref=${storeId}`;
+};
+
 // ── Affiliates ────────────────────────────────────────────────────────────────
 
 export const getAffiliates = catchAsync(
@@ -26,12 +54,10 @@ export const getAffiliates = catchAsync(
     const { page, limit, search, status } = validateAffiliatePaginatedQuery(
       req.query,
     );
-    const result = await affiliateService.getAffiliates(
-      page,
-      limit,
-      search,
-      status,
-    );
+
+    const useCase = new ListAffiliatesUseCase();
+    const result = await useCase.execute({ page, limit, search, status });
+
     sendSuccess(res, result);
   },
 );
@@ -39,15 +65,29 @@ export const getAffiliates = catchAsync(
 export const getAffiliate = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateAffiliateIdParam(req.params);
-    const affiliate = await affiliateService.getAffiliate(id);
+
+    const useCase = new GetAffiliateUseCase();
+    const affiliate = await useCase.execute({ affiliateId: id });
+
     sendSuccess(res, affiliate);
   },
 );
 
 export const createAffiliate = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const dto = validateCreateAffiliate(req.body);
-    const affiliate = await affiliateService.createAffiliate(dto);
+    // Validate with the validator first
+    validateCreateAffiliate(req.body);
+
+    // Get values from body - validator ensures email exists
+    const { email, name } = req.body as { email: string; name?: string };
+
+    const useCase = new CreateAffiliateUseCase();
+    const affiliate = await useCase.execute({
+      userId: "", // Admin-created affiliates don't have a userId yet
+      email,
+      name: name || email.split("@")[0],
+    });
+
     res.status(201).json({ success: true, data: affiliate });
   },
 );
@@ -56,7 +96,10 @@ export const updateAffiliate = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateAffiliateIdParam(req.params);
     const dto = validateUpdateAffiliate(req.body);
-    const affiliate = await affiliateService.updateAffiliate(id, dto);
+
+    const useCase = new UpdateAffiliateUseCase();
+    const affiliate = await useCase.execute({ affiliateId: id, ...dto });
+
     sendSuccess(res, affiliate);
   },
 );
@@ -64,7 +107,10 @@ export const updateAffiliate = catchAsync(
 export const suspendAffiliate = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateAffiliateIdParam(req.params);
-    const affiliate = await affiliateService.suspendAffiliate(id);
+
+    const useCase = new SuspendAffiliateUseCase();
+    const affiliate = await useCase.execute({ affiliateId: id });
+
     sendSuccess(res, affiliate, "Affiliate suspended");
   },
 );
@@ -73,8 +119,11 @@ export const activateAffiliate = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateAffiliateIdParam(req.params);
 
-    const affiliate = await affiliateService.getAffiliate(id);
-    if (affiliate.paymentStatus !== "paid") {
+    // First get to check payment status
+    const getUseCase = new GetAffiliateUseCase();
+    const affiliate = await getUseCase.execute({ affiliateId: id });
+
+    if (!affiliate?.paymentStatus || affiliate.paymentStatus !== "paid") {
       res.status(400).json({
         success: false,
         message: "Affiliate must complete payment before activation",
@@ -82,7 +131,9 @@ export const activateAffiliate = catchAsync(
       return;
     }
 
-    const updated = await affiliateService.activateAffiliate(id);
+    const useCase = new ActivateAffiliateUseCase();
+    const updated = await useCase.execute({ affiliateId: id });
+
     sendSuccess(res, updated, "Affiliate activated");
   },
 );
@@ -103,7 +154,8 @@ export const updateMyPixelId = catchAsync(
       return;
     }
 
-    const affiliate = await affiliateService.updateMyPixelId(userId, pixelId);
+    const useCase = new UpdateMyPixelIdUseCase();
+    const affiliate = await useCase.execute({ userId, pixelId });
     sendSuccess(
       res,
       {
@@ -112,9 +164,9 @@ export const updateMyPixelId = catchAsync(
         paymentStatus: affiliate.paymentStatus,
         email: affiliate.email,
         name: affiliate.name,
-        storeId: buildStoreUrl(affiliate.store_id),
-        pixelId: affiliate.pixel_id,
-        createdAt: affiliate.created_at,
+        storeId: buildStoreUrl(affiliate.storeId),
+        pixelId: affiliate.pixelId,
+        createdAt: affiliate.createdAt,
       },
       "Pixel ID updated",
     );
@@ -132,7 +184,15 @@ export const getMyAffiliateStatus = catchAsync(
       return;
     }
 
-    let affiliate = await affiliateService.getAffiliateByUserId(userId);
+    let affiliate;
+
+    // Try to get existing affiliate
+    const getByUserIdUseCase = new GetAffiliateByUserIdUseCase();
+    try {
+      affiliate = await getByUserIdUseCase.execute({ userId });
+    } catch {
+      affiliate = null;
+    }
 
     if (!affiliate) {
       const email = user.email ?? user.user_metadata?.email;
@@ -147,36 +207,33 @@ export const getMyAffiliateStatus = catchAsync(
         });
         return;
       }
-      affiliate = await affiliateService.createAffiliateForAuthUser(
+      // Create affiliate for auth user
+      const createUseCase = new CreateAffiliateUseCase();
+      affiliate = await createUseCase.execute({
         userId,
         email,
         name,
-      );
+      });
     }
 
-    const linkCode =
-      affiliate.affiliateLink ?? affiliate.affiliate_link ?? null;
+    const linkCode = affiliate.affiliateLink ?? null;
 
     const effectiveStatus =
-      affiliate.paymentStatus === "unpaid" ||
-      affiliate.payment_status === "unpaid"
-        ? "pending"
-        : affiliate.status;
+      affiliate.paymentStatus === "unpaid" ? "pending" : affiliate.status;
 
     sendSuccess(res, {
       id: affiliate.id,
       status: effectiveStatus,
-      paymentStatus:
-        affiliate.paymentStatus ?? affiliate.payment_status ?? "unpaid",
+      paymentStatus: affiliate.paymentStatus ?? "unpaid",
       email: affiliate.email,
       name: affiliate.name,
-      storeId: buildStoreUrl(affiliate.store_id ?? affiliate.storeId),
-      pixelId: affiliate.pixel_id ?? affiliate.pixelId,
+      storeId: buildStoreUrl(affiliate.storeId),
+      pixelId: affiliate.pixelId,
       affiliateLink: linkCode
         ? `${process.env.FRONTEND_URL || "http://localhost:5173"}/register?ref=${linkCode}`
         : null,
       affiliateLinkCode: linkCode,
-      createdAt: affiliate.created_at ?? affiliate.createdAt,
+      createdAt: affiliate.createdAt,
     });
   },
 );
@@ -184,7 +241,10 @@ export const getMyAffiliateStatus = catchAsync(
 export const deleteAffiliate = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateAffiliateIdParam(req.params);
-    await affiliateService.deleteAffiliate(id);
+
+    const useCase = new DeleteAffiliateUseCase();
+    await useCase.execute({ affiliateId: id });
+
     res.status(204).send();
   },
 );
@@ -194,7 +254,10 @@ export const deleteAffiliate = catchAsync(
 export const getAffiliateProducts = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateAffiliateIdParam(req.params);
-    const products = await affiliateService.getAffiliateProducts(id);
+
+    const useCase = new GetAffiliateProductsUseCase();
+    const products = await useCase.execute({ affiliateId: id });
+
     sendSuccess(res, products);
   },
 );
@@ -203,7 +266,15 @@ export const assignProduct = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateAffiliateIdParam(req.params);
     const dto = validateAssignProduct(req.body);
-    const result = await affiliateService.assignProduct(id, dto);
+
+    const useCase = new AssignProductUseCase();
+    const result = await useCase.execute({
+      affiliateId: id,
+      productId: dto.productId,
+      commissionType: dto.commissionType,
+      commissionValue: dto.commissionValue,
+    });
+
     res.status(201).json({ success: true, data: result });
   },
 );
@@ -211,7 +282,10 @@ export const assignProduct = catchAsync(
 export const removeProduct = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id, productId } = validateAffiliateProductParam(req.params);
-    await affiliateService.removeProductFromAffiliate(id, productId);
+
+    const useCase = new RemoveProductUseCase();
+    await useCase.execute({ affiliateId: id, productId });
+
     res.status(204).send();
   },
 );
@@ -232,20 +306,19 @@ export const createAffiliatePayment = catchAsync(
       return;
     }
 
-    // FIX: Frontend sends { referralCode } in the body.
-    // Also support affiliateLink from query params as a fallback.
     const affiliateLink =
       (req.body.referralCode as string | undefined) ||
       (req.query.affiliateLink as string | undefined) ||
       (req.body.affiliateLink as string | undefined) ||
       undefined;
 
-    const result = await affiliateService.createAffiliatePayment(
+    const useCase = new CreateAffiliatePaymentUseCase();
+    const result = await useCase.execute({
       userId,
-      userEmail,
-      userFullName,
+      email: userEmail,
+      fullName: userFullName,
       affiliateLink,
-    );
+    });
     sendSuccess(res, result, "Payment initiated");
   },
 );
@@ -259,11 +332,12 @@ export const verifyAffiliatePayment = catchAsync(
       return res.redirect(redirectUrl);
     }
 
-    const result = await affiliateService.verifyAffiliatePayment(
-      intentId as string,
-      userId as string,
-      affiliateLink as string | undefined,
-    );
+    const useCase = new VerifyAffiliatePaymentUseCase();
+    const result = await useCase.execute({
+      intentId: intentId as string,
+      userId: userId as string,
+      affiliateLink: affiliateLink as string | undefined,
+    });
 
     if (result.success) {
       const redirectUrl = `${env.FRONTEND_URL}/affiliate/registration/callback?status=success`;
@@ -300,11 +374,12 @@ export const paymongoWebhook = catchAsync(
           : undefined;
 
       if (intentId && userId) {
-        await affiliateService.verifyAffiliatePayment(
+        const useCase = new VerifyAffiliatePaymentUseCase();
+        await useCase.execute({
           intentId,
           userId,
           affiliateLink,
-        );
+        });
       } else {
         sendSuccess(res, null, "Webhook received - missing metadata");
       }
@@ -318,7 +393,8 @@ export const paymongoWebhook = catchAsync(
 
 export const getAffiliateSettings = catchAsync(
   async (_req: Request, res: Response): Promise<void> => {
-    const settings = await affiliateService.getAffiliateSettings();
+    const useCase = new GetAffiliateSettingsUseCase();
+    const settings = await useCase.execute();
     sendSuccess(res, settings);
   },
 );
@@ -328,11 +404,12 @@ export const updateAffiliateSettings = catchAsync(
     const { registrationFee, referralCommissionRate, referralCommissionType } =
       req.body;
 
-    const settings = await affiliateService.updateAffiliateSettings(
+    const useCase = new UpdateAffiliateSettingsUseCase();
+    const settings = await useCase.execute({
       registrationFee,
       referralCommissionRate,
       referralCommissionType,
-    );
+    });
     sendSuccess(res, settings, "Settings updated successfully");
   },
 );
@@ -346,7 +423,9 @@ export const getMyAffiliateLink = catchAsync(
       throw new AppError("Unauthorized", 401);
     }
 
-    const result = await affiliateService.getMyAffiliateLink(userId);
+    const useCase = new GenerateAffiliateLinkUseCase();
+    const result = await useCase.execute({ userId });
+
     sendSuccess(res, result);
   },
 );
@@ -361,7 +440,8 @@ export const setAffiliateReferrer = catchAsync(
       throw new AppError("Both affiliateId and referrerId are required", 400);
     }
 
-    await affiliateService.setAffiliateReferrer(affiliateId, referrerId);
+    const useCase = new SetAffiliateReferrerUseCase();
+    await useCase.execute({ affiliateId, referrerId });
     sendSuccess(res, null, "Referrer updated successfully");
   },
 );
@@ -377,10 +457,11 @@ export const triggerReferralCommission = catchAsync(
       );
     }
 
-    const result = await affiliateService.recordReferralCommission(
-      affiliateId,
+    const useCase = new RecordReferralCommissionUseCase();
+    const result = await useCase.execute({
+      referredAffiliateId: affiliateId,
       paymentAmount,
-    );
+    });
 
     if (!result) {
       throw new AppError(
@@ -403,8 +484,8 @@ export const addCommissionByReferralCode = catchAsync(
       throw new AppError("referralCode is required", 400);
     }
 
-    const result =
-      await affiliateService.addCommissionByReferralCode(referralCode);
+    const useCase = new AddCommissionByReferralCodeUseCase();
+    const result = await useCase.execute({ referralCode });
 
     sendSuccess(res, result, "Commission added successfully");
   },
