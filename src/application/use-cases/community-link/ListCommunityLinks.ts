@@ -62,14 +62,24 @@ export class ListCommunityLinksUseCase {
   async execute(
     input: ListCommunityLinksInput,
   ): Promise<ListCommunityLinksOutput> {
+    console.log("[ListCommunityLinksUseCase] Input:", JSON.stringify(input));
     const page = input.page ?? 1;
     const limit = Math.min(input.limit ?? 10, 100);
 
-    const result = await this.repository.findAll(page, limit, input.filters);
-
-    return {
-      links: result.links.map((link) => link.toResponse()),
-      meta: result.meta,
-    };
+    try {
+      const result = await this.repository.findAll(page, limit, input.filters);
+      console.log(
+        "[ListCommunityLinksUseCase] Result:",
+        result.links.length,
+        "links found",
+      );
+      return {
+        links: result.links.map((link) => link.toResponse()),
+        meta: result.meta,
+      };
+    } catch (error) {
+      console.error("[ListCommunityLinksUseCase] Error:", error);
+      throw error;
+    }
   }
 }

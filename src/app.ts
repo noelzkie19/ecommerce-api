@@ -27,6 +27,7 @@ import affiliateTrackingRoutes from "./modules/affiliate-tracking/affiliate-trac
 import affiliatePixelRoutes from "./modules/affiliate-pixel/affiliate-pixel.routes";
 import communityLinksRoutes from "./modules/community-links/community-links.routes";
 import imageLibraryRoutes from "./modules/image-library/image-library.routes";
+import coursesRoutes from "./modules/courses/courses.routes";
 
 const app: Application = express();
 
@@ -98,6 +99,7 @@ app.use("/api/affiliate-pixel", affiliatePixelRoutes);
 app.use("/api/testimonials", testimonialsRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/community-links", communityLinksRoutes);
+app.use("/api/courses", coursesRoutes);
 app.use("/api", imageLibraryRoutes);
 
 // ── Health Check ──────────────────────────────────────────────
