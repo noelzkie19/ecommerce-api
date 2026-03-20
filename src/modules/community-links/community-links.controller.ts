@@ -18,10 +18,20 @@ import {
  */
 export const getLinks = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const { category, search } = req.query as {
+    console.log("[CommunityLinks] Request query:", req.query);
+    const { category, search, isActive } = req.query as {
       category?: string;
       search?: string;
+      isActive?: string;
     };
+    console.log(
+      "[CommunityLinks] Parsed params - category:",
+      category,
+      "search:",
+      search,
+      "isActive:",
+      isActive,
+    );
     const page = Math.max(1, Number.parseInt(req.query.page as string) || 1);
     const limit = Math.min(
       100,

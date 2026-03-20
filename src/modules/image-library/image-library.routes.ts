@@ -12,7 +12,7 @@ import { requireAuth } from "../auth/auth.middleware";
 const router = Router();
 
 // ---------------------------------------------------------------------------
-// Public Routes
+// Public Routes - List
 // ---------------------------------------------------------------------------
 
 /**
@@ -48,80 +48,31 @@ const router = Router();
  *       200:
  *         description: List of image library items
  */
-router.get("/image-library", imageLibraryController.getImages);
-
-/**
- * @openapi
- * /api/image-library/{id}:
- *   get:
- *     tags: [Image Library]
- *     summary: Get image library item by ID
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Image library item details
- *       404:
- *         description: Image library item not found
- */
-router.get("/image-library/:id", imageLibraryController.getImageById);
+router.get("/", imageLibraryController.getImages);
 
 // ---------------------------------------------------------------------------
-// Admin Routes (protected)
+// Admin Routes (protected) - MUST come before /:id to avoid route conflicts
 // ---------------------------------------------------------------------------
 
 /**
  * @openapi
- * /api/admin/image-library:
+ * /api/image-library/admin:
  *   get:
  *     tags: [Admin - Image Library]
  *     summary: List all image library items (admin)
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: category
- *         schema:
- *           type: string
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *       - in: query
- *         name: isActive
- *         schema:
- *           type: string
- *           enum: [true, false]
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
  *     responses:
  *       200:
  *         description: List of image library items
  *       401:
  *         description: Unauthorized
  */
-router.get(
-  "/admin/image-library",
-  requireAuth,
-  imageLibraryAdminController.getImages,
-);
+router.get("/admin", requireAuth, imageLibraryAdminController.getImages);
 
 /**
  * @openapi
- * /api/admin/image-library:
+ * /api/image-library/admin:
  *   post:
  *     tags: [Admin - Image Library]
  *     summary: Create a new image library item
@@ -158,15 +109,11 @@ router.get(
  *       401:
  *         description: Unauthorized
  */
-router.post(
-  "/admin/image-library",
-  requireAuth,
-  imageLibraryAdminController.createImage,
-);
+router.post("/admin", requireAuth, imageLibraryAdminController.createImage);
 
 /**
  * @openapi
- * /api/admin/image-library/{id}:
+ * /api/image-library/admin/{id}:
  *   patch:
  *     tags: [Admin - Image Library]
  *     summary: Update an image library item
@@ -179,43 +126,21 @@ router.post(
  *         schema:
  *           type: string
  *           format: uuid
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *               category:
- *                 type: string
- *               thumbnailUrl:
- *                 type: string
- *               imageUrl:
- *                 type: string
- *               description:
- *                 type: string
- *               displayOrder:
- *                 type: integer
- *               isActive:
- *                 type: boolean
  *     responses:
  *       200:
  *         description: Image library item updated
  *       401:
  *         description: Unauthorized
- *       404:
- *         description: Image library item not found
  */
 router.patch(
-  "/admin/image-library/:id",
+  "/admin/:id",
   requireAuth,
   imageLibraryAdminController.updateImage,
 );
 
 /**
  * @openapi
- * /api/admin/image-library/{id}:
+ * /api/image-library/admin/{id}:
  *   delete:
  *     tags: [Admin - Image Library]
  *     summary: Delete an image library item
@@ -233,13 +158,36 @@ router.patch(
  *         description: Image library item deleted
  *       401:
  *         description: Unauthorized
- *       404:
- *         description: Image library item not found
  */
 router.delete(
-  "/admin/image-library/:id",
+  "/admin/:id",
   requireAuth,
   imageLibraryAdminController.deleteImage,
 );
+
+// ---------------------------------------------------------------------------
+// Public Routes - Get by ID (must come AFTER /admin routes)
+// ---------------------------------------------------------------------------
+
+/**
+ * @openapi
+ * /api/image-library/{id}:
+ *   get:
+ *     tags: [Image Library]
+ *     summary: Get image library item by ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Image library item details
+ *       404:
+ *         description: Image library item not found
+ */
+router.get("/:id", imageLibraryController.getImageById);
 
 export default router;
