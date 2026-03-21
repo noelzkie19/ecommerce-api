@@ -10,8 +10,15 @@ import {
   validateOrderIdParam,
   validatePaginatedQuery,
 } from "../../common/validators/order.validator";
-import { OrderStatus } from "./order.types";
-import * as orderService from "./order.service";
+import { OrderStatus } from "../../domain/entities/Order";
+import {
+  PlaceOrderUseCase,
+  VerifyGCashPaymentUseCase,
+  GetOrdersUseCase,
+  GetOrderByIdUseCase,
+  UpdateOrderStatusUseCase,
+  GetAllOrdersAdminUseCase,
+} from "../../application/use-cases/order";
 
 const VALID_STATUSES = new Set<OrderStatus>([
   "pending",
@@ -31,7 +38,7 @@ export const placeOrder = catchAsync(
 
     // result = { order, gcashRedirectUrl }
     // gcashRedirectUrl is null for COD/card — frontend ignores it
-    const result = await orderService.placeOrder(owner, dto);
+    const result = await new PlaceOrderUseCase().execute({ owner, dto });
     sendSuccess(res, result, "Order placed successfully", 201);
   },
 );
@@ -42,17 +49,7 @@ export const getOrder = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateOrderIdParam(req.params);
     const owner = resolveOwner(req, { required: true });
-    const order = await orderService.getOrder(id);
-
-    if (!order) throw new AppError("Order not found", 404);
-
-    // Verify the caller owns this order
-    const ownerMatches =
-      (owner.userId && order.user_id === owner.userId) ||
-      (owner.guestId && order.guest_id === owner.guestId);
-
-    if (!ownerMatches) throw new AppError("Forbidden", 403);
-
+    const order = await new GetOrderByIdUseCase().execute({ id, owner });
     sendSuccess(res, order);
   },
 );
@@ -62,8 +59,8 @@ export const getOrder = catchAsync(
 export const getOrders = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const owner = resolveOwner(req, { required: true });
-    const orders = await orderService.getOrders(owner);
-    sendSuccess(res, orders);
+    const result = await new GetOrdersUseCase().execute({ owner });
+    sendSuccess(res, result);
   },
 );
 
@@ -72,8 +69,7 @@ export const getOrders = catchAsync(
 export const getOrderAdmin = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateOrderIdParam(req.params);
-    const order = await orderService.getOrder(id);
-    if (!order) throw new AppError("Order not found", 404);
+    const order = await new GetOrderByIdUseCase().execute({ id });
     sendSuccess(res, order);
   },
 );
@@ -89,7 +85,11 @@ export const getAllOrders = catchAsync(
         ? (status as OrderStatus)
         : undefined;
 
-    const result = await orderService.getAllOrders(page, limit, validStatus);
+    const result = await new GetAllOrdersAdminUseCase().execute({
+      page,
+      limit,
+      status: validStatus,
+    });
     sendSuccess(res, result);
   },
 );
@@ -101,7 +101,7 @@ export const updateOrderStatus = catchAsync(
     const { id } = validateOrderIdParam(req.params);
     const { status } = validateUpdateOrderStatus(req.body);
 
-    const order = await orderService.updateOrderStatus(id, status);
+    const order = await new UpdateOrderStatusUseCase().execute({ id, status });
     sendSuccess(res, order, "Order status updated successfully");
   },
 );
@@ -112,7 +112,7 @@ export const verifyGCashPayment = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { intentId } = validateIntentIdParam(req.params);
 
-    const result = await orderService.verifyGCashPayment(intentId);
+    const result = await new VerifyGCashPaymentUseCase().execute({ intentId });
     sendSuccess(res, result, "Payment verified");
   },
 );
@@ -133,7 +133,7 @@ export const paymongoWebhook = catchAsync(
         | undefined;
 
       if (intentId) {
-        await orderService.verifyGCashPayment(intentId);
+        await new VerifyGCashPaymentUseCase().execute({ intentId });
       }
     }
 

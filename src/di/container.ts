@@ -15,6 +15,7 @@ import { SupabaseImageLibraryRepository } from "../infrastructure/database/supab
 import { SupabaseStockRepository } from "../infrastructure/database/supabase/SupabaseStockRepository";
 import { SupabaseTestimonialRepository } from "../infrastructure/database/supabase/SupabaseTestimonialRepository";
 import { SupabaseCartRepository } from "../infrastructure/database/supabase/SupabaseCartRepository";
+import { SupabaseOrderRepository } from "../infrastructure/database/supabase/SupabaseOrderRepository";
 
 /**
  * Dependency Container
@@ -75,6 +76,10 @@ class Container {
     this.dependencies.set(
       "ICartRepository",
       new SupabaseCartRepository(),
+    );
+    this.dependencies.set(
+      "IOrderRepository",
+      new SupabaseOrderRepository(),
     );
   }
 

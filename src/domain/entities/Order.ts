@@ -310,6 +310,7 @@ export class OrderItem {
   readonly productId: string;
   readonly quantity: number;
   readonly unitPrice: number;
+  readonly product: OrderItemProduct | null;
 
   constructor(props: OrderItemProps) {
     this.id = props.id;
@@ -317,6 +318,7 @@ export class OrderItem {
     this.productId = props.productId;
     this.quantity = props.quantity;
     this.unitPrice = props.unitPrice;
+    this.product = props.product ?? null;
   }
 
   /**
@@ -337,6 +339,7 @@ export class OrderItem {
       quantity: this.quantity,
       unitPrice: this.unitPrice,
       total: this.total,
+      product: this.product,
     };
   }
 }
@@ -376,6 +379,7 @@ interface OrderItemProps {
   productId: string;
   quantity: number;
   unitPrice: number;
+  product?: OrderItemProduct | null;
 }
 
 /**
@@ -438,6 +442,18 @@ export interface OrderItemDatabaseRow {
 }
 
 /**
+ * Nested product data on an order item response
+ */
+export interface OrderItemProduct {
+  id: string;
+  name: string;
+  price: number;
+  imageUrl: string | null;
+  primaryImageUrl: string | null;
+  images: Array<{ id: string; url: string; position: number }>;
+}
+
+/**
  * API Response type
  */
 export interface OrderResponse {
@@ -474,4 +490,5 @@ export interface OrderItemResponse {
   quantity: number;
   unitPrice: number;
   total: number;
+  product: OrderItemProduct | null;
 }
