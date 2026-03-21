@@ -11,3 +11,4 @@ export * from "./use-cases/auth";
 export * from "./use-cases/product";
 export * from "./use-cases/course";
 export * from "./use-cases/community-link";
+export * from "./use-cases/stocks";

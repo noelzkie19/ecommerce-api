@@ -29,3 +29,5 @@ export {
   SupabaseImageLibraryRepository,
   imageLibraryRepository,
 } from "./database/supabase/SupabaseImageLibraryRepository";
+
+export { SupabaseStockRepository } from "./database/supabase/SupabaseStockRepository";

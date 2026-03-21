@@ -37,3 +37,4 @@ export type {
   AffiliateProduct,
   AffiliateSettings,
 } from "./IAffiliateRepository";
+export type { IStockRepository } from "./IStockRepository";
