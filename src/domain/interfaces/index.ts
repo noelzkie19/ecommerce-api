@@ -38,3 +38,7 @@ export type {
   AffiliateSettings,
 } from "./IAffiliateRepository";
 export type { IStockRepository } from "./IStockRepository";
+export type {
+  ITestimonialRepository,
+  PaginatedTestimonials,
+} from "./ITestimonialRepository";
