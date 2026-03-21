@@ -2,6 +2,60 @@
  * Affiliate Use Cases Index
  */
 
+// Shared Types
+export type AffiliateStatus = "pending" | "active" | "suspended";
+export type CommissionType = "percentage" | "fixed";
+export type PaymentStatus = "unpaid" | "paid";
+
+// DTOs for Repository Layer
+export interface CreateAffiliateDTO {
+  email: string;
+  pixelId?: string;
+  storeId?: string;
+  status?: AffiliateStatus;
+}
+
+export interface UpdateAffiliateDTO {
+  name?: string;
+  email?: string;
+  status?: AffiliateStatus;
+  paymentStatus?: PaymentStatus;
+  pixelId?: string;
+  storeId?: string;
+}
+
+export interface AssignProductDTO {
+  productId: string;
+  commissionType: CommissionType;
+  commissionValue: number;
+}
+
+// Pagination
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PaginatedAffiliates<T = any> {
+  data: T[];
+  meta: PaginationMeta;
+}
+
+// Affiliate Settings
+export interface AffiliateSettings {
+  registrationFee: number;
+  referralCommissionRate: number;
+  referralCommissionType: "percentage" | "fixed";
+}
+
+export interface UpdateSettingsDTO {
+  registrationFee?: number;
+  referralCommissionRate?: number;
+  referralCommissionType?: "percentage" | "fixed";
+}
+
 // List & Get
 export {
   ListAffiliatesUseCase,

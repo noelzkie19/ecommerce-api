@@ -14,8 +14,8 @@ import {
   UpdateAffiliateSaleStatusUseCase,
   ApproveAffiliateSaleUseCase,
   RejectAffiliateSaleUseCase,
+  AffiliateSaleStatus,
 } from "../../application/use-cases/affiliate-sales";
-import { AffiliateSaleStatus } from "./affiliate-sales.types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

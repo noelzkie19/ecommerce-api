@@ -1,5 +1,5 @@
 import { env } from "../../config/env";
-import { TrackingMethod } from "./affiliate-tracking.types";
+import { TrackingMethod } from "../../application/use-cases/affiliate-tracking";
 
 // ── Constants ───────────────────────────────────────────────────────────────────
 

@@ -8,8 +8,8 @@ import { AppError } from "../../common/utils/AppError";
 import * as affiliateSalesService from "../affiliates-sales/affiliate-sales.repository";
 import {
   activateAffiliateByUserId,
-  markAffiliateAsPaidByUserId,
-} from "../affiliates/affiliate.service";
+  markAsPaidByUserId,
+} from "../affiliates/affiliate.repository";
 import { attributeOrderFromData } from "../../application/use-cases/affiliate-tracking";
 import { firePurchaseEvent } from "../../application/use-cases/affiliate-pixel";
 import { supabaseAdmin } from "../../config/supabase";
@@ -72,7 +72,7 @@ export const placeOrder = async (
 
     // Mark affiliate as paid and activate for COD orders
     if (owner.userId) {
-      await markAffiliateAsPaidByUserId(owner.userId);
+      await markAsPaidByUserId(owner.userId);
       await activateAffiliateByUserId(owner.userId);
     }
   }
@@ -218,7 +218,7 @@ export const verifyGCashPayment = async (intentId: string) => {
 
     // Mark affiliate as paid and activate (upgrade from pending to active)
     if (order.user_id) {
-      await markAffiliateAsPaidByUserId(order.user_id);
+      await markAsPaidByUserId(order.user_id);
       await activateAffiliateByUserId(order.user_id);
     }
   } else if (status === "payment_intent.payment_failed") {

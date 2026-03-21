@@ -5,7 +5,7 @@ import {
   UpdateTrackingLinkDTO,
   AttributeOrderDTO,
   TrackingMethod,
-} from "./affiliate-tracking.types";
+} from "../../application/use-cases/affiliate-tracking";
 
 const db = supabaseAdmin as any;
 

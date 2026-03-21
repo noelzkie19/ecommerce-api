@@ -1,6 +1,9 @@
 import { supabaseAdmin } from "../../config/supabase";
 import { AppError } from "../../common/utils/AppError";
-import { MetaEventType, PixelEventStatus } from "./affiliate-pixel.types";
+import {
+  MetaEventType,
+  PixelEventStatus,
+} from "../../application/use-cases/affiliate-pixel";
 
 const db = supabaseAdmin as any;
 
