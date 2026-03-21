@@ -42,3 +42,4 @@ export type {
   ITestimonialRepository,
   PaginatedTestimonials,
 } from "./ITestimonialRepository";
+export type { ICartRepository } from "./ICartRepository";

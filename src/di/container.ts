@@ -14,6 +14,7 @@ import { SupabaseCommunityLinkRepository } from "../infrastructure/database/supa
 import { SupabaseImageLibraryRepository } from "../infrastructure/database/supabase/SupabaseImageLibraryRepository";
 import { SupabaseStockRepository } from "../infrastructure/database/supabase/SupabaseStockRepository";
 import { SupabaseTestimonialRepository } from "../infrastructure/database/supabase/SupabaseTestimonialRepository";
+import { SupabaseCartRepository } from "../infrastructure/database/supabase/SupabaseCartRepository";
 
 /**
  * Dependency Container
@@ -71,6 +72,10 @@ class Container {
       "ITestimonialRepository",
       new SupabaseTestimonialRepository(),
     );
+    this.dependencies.set(
+      "ICartRepository",
+      new SupabaseCartRepository(),
+    );
   }
 
   /**
@@ -127,4 +132,5 @@ export const TOKENS = {
   IImageLibraryRepository: "IImageLibraryRepository",
   IStockRepository: "IStockRepository",
   ITestimonialRepository: "ITestimonialRepository",
+  ICartRepository: "ICartRepository",
 } as const;

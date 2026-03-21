@@ -32,3 +32,4 @@ export {
 
 export { SupabaseStockRepository } from "./database/supabase/SupabaseStockRepository";
 export { SupabaseTestimonialRepository } from "./database/supabase/SupabaseTestimonialRepository";
+export { SupabaseCartRepository } from "./database/supabase/SupabaseCartRepository";

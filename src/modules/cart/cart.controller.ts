@@ -7,13 +7,20 @@ import {
   validateUpdateCartItem,
   validateCartItemIdParam,
 } from "../../common/validators/cart.validator";
-import * as cartService from "./cart.service";
+import {
+  GetCartUseCase,
+  AddToCartUseCase,
+  UpdateCartItemUseCase,
+  RemoveFromCartUseCase,
+  ClearCartUseCase,
+} from "../../application/use-cases/cart";
 
 export const getCart = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const owner = resolveOwner(req, { required: true });
-    const cart = await cartService.getCart(owner);
-    sendSuccess(res, cart);
+    const useCase = new GetCartUseCase();
+    const result = await useCase.execute({ owner });
+    sendSuccess(res, result.items);
   },
 );
 
@@ -21,7 +28,12 @@ export const addToCart = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const owner = resolveOwner(req, { required: true });
     const dto = validateAddToCart(req.body);
-    const item = await cartService.addToCart(owner, dto);
+    const useCase = new AddToCartUseCase();
+    const item = await useCase.execute({
+      owner,
+      productId: dto.productId,
+      quantity: dto.quantity,
+    });
     sendSuccess(res, item, "Added to cart", 201);
   },
 );
@@ -31,7 +43,8 @@ export const updateCartItem = catchAsync(
     const owner = resolveOwner(req, { required: true });
     const { id } = validateCartItemIdParam(req.params);
     const { quantity } = validateUpdateCartItem(req.body);
-    const item = await cartService.updateCartItem(id, owner, { quantity });
+    const useCase = new UpdateCartItemUseCase();
+    const item = await useCase.execute({ id, owner, quantity });
     sendSuccess(res, item, "Cart updated");
   },
 );
@@ -40,7 +53,8 @@ export const removeFromCart = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const owner = resolveOwner(req, { required: true });
     const { id } = validateCartItemIdParam(req.params);
-    await cartService.removeFromCart(id, owner);
+    const useCase = new RemoveFromCartUseCase();
+    await useCase.execute({ id, owner });
     sendSuccess(res, null, "Item removed from cart");
   },
 );
@@ -48,7 +62,8 @@ export const removeFromCart = catchAsync(
 export const clearCart = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const owner = resolveOwner(req, { required: true });
-    await cartService.clearCart(owner);
+    const useCase = new ClearCartUseCase();
+    await useCase.execute({ owner });
     sendSuccess(res, null, "Cart cleared");
   },
 );
