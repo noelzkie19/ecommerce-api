@@ -1,5 +1,5 @@
 import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
-import { ConversionValueType } from "../../../modules/affiliate-pixel/affiliate-pixel.types";
+import { ConversionValueType } from "./index";
 
 export interface GetAffiliatePixelConfigInput {
   affiliateId: string;

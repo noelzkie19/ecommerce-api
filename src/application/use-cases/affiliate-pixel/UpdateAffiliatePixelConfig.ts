@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "../../../config/supabase";
 import { AppError } from "../../../common/utils/AppError";
-import { ConversionValueType } from "../../../modules/affiliate-pixel/affiliate-pixel.types";
+import { ConversionValueType } from "./index";
 
 export interface UpdateAffiliatePixelConfigInput {
   affiliateId: string;
@@ -53,7 +53,8 @@ export const updateAffiliatePixelConfig = async (
     pixelAccessToken: input.pixelAccessToken,
     enablePurchaseEvent: input.enablePurchaseEvent ?? false,
     enableLeadEvent: input.enableLeadEvent ?? false,
-    conversionValueType: input.conversionValueType || "sale_amount",
+    conversionValueType:
+      (input.conversionValueType as ConversionValueType) || "sale-amount",
     conversionValueFixed: input.conversionValueFixed,
   };
 };

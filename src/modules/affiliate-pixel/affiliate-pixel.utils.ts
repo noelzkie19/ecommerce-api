@@ -3,7 +3,7 @@ import {
   MetaPixelEvent,
   MetaUserData,
   MetaCustomData,
-} from "./affiliate-pixel.types";
+} from "../../application/use-cases/affiliate-pixel";
 
 const META_GRAPH_API_VERSION = "v18.0";
 const META_CONVERSIONS_URL = `https://graph.facebook.com/${META_GRAPH_API_VERSION}`;

@@ -4,7 +4,10 @@
  * Retrieves a paginated list of affiliate sales.
  */
 
-import { AffiliateSaleStatus } from "../../../modules/affiliates-sales/affiliate-sales.types";
+/**
+ * Status of an affiliate sale
+ */
+export type AffiliateSaleStatus = "pending" | "approved" | "rejected";
 
 /**
  * Input DTO for ListAffiliateSalesUseCase

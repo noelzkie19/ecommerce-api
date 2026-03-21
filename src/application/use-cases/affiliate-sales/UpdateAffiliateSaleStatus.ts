@@ -4,7 +4,10 @@
  * Updates the status of an affiliate sale.
  */
 
-import { AffiliateSaleStatus } from "../../../modules/affiliates-sales/affiliate-sales.types";
+/**
+ * Status of an affiliate sale
+ */
+export type AffiliateSaleStatus = "pending" | "approved" | "rejected";
 
 /**
  * Input DTO for UpdateAffiliateSaleStatusUseCase

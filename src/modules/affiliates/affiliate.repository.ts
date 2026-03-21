@@ -5,7 +5,7 @@ import {
   UpdateAffiliateDTO,
   AssignProductDTO,
   AffiliateStatus,
-} from "./affiliate.types";
+} from "../../application/use-cases/affiliate";
 
 const db = supabaseAdmin as any;
 

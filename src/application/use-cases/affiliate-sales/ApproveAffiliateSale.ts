@@ -4,7 +4,10 @@
  * Approves an affiliate sale and updates affiliate totals.
  */
 
-import { AffiliateSaleStatus } from "../../../modules/affiliates-sales/affiliate-sales.types";
+/**
+ * Status of an affiliate sale
+ */
+export type AffiliateSaleStatus = "pending" | "approved" | "rejected";
 
 /**
  * Input DTO for ApproveAffiliateSaleUseCase

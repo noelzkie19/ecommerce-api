@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "../../config/supabase";
 import { AppError } from "../../common/utils/AppError";
-import { AffiliateSaleStatus } from "./affiliate-sales.types";
+import { AffiliateSaleStatus } from "../../application/use-cases/affiliate-sales";
 
 const db = supabaseAdmin as any;
 

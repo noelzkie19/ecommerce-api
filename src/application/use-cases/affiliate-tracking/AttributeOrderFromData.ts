@@ -1,6 +1,6 @@
 import * as trackingRepository from "../../../modules/affiliate-tracking/affiliate-tracking.repository";
 import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
-import { TrackingMethod } from "../../../modules/affiliate-tracking/affiliate-tracking.types";
+import { TrackingMethod } from "./index";
 
 export interface AttributeOrderFromDataInput {
   orderId: string;
