@@ -179,8 +179,14 @@ export class Affiliate {
       totalSales: this.totalSales,
       totalCommissions: this.totalCommissions,
       affiliateCommission: this.affiliateCommission,
-      createdAt: this.createdAt.toISOString(),
-      updatedAt: this.updatedAt.toISOString(),
+      createdAt:
+        this.createdAt && !Number.isNaN(this.createdAt.getTime())
+          ? this.createdAt.toISOString()
+          : null,
+      updatedAt:
+        this.updatedAt && !Number.isNaN(this.updatedAt.getTime())
+          ? this.updatedAt.toISOString()
+          : null,
     };
   }
 
@@ -285,6 +291,6 @@ export interface AffiliateResponse {
   totalSales: number;
   totalCommissions: number;
   affiliateCommission: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }

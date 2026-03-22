@@ -1,6 +1,9 @@
-import { supabase } from "../../config/supabase";
+import { supabaseAdmin } from "../../config/supabase";
 import { AppError } from "../../common/utils/AppError";
-import { UpdateStockDTO } from "./stocks.type";
+
+interface UpdateStockDTO {
+  quantity: number;
+}
 
 export const findAll = async (
   filters: { search?: string } = {},
@@ -10,8 +13,8 @@ export const findAll = async (
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
-  let query = supabase
-    .from("stock")
+  let query = supabaseAdmin
+    .from("stocks")
     .select(
       `
       id,
@@ -50,8 +53,8 @@ export const findAll = async (
 };
 
 export const findByProductId = async (productId: string) => {
-  const { data, error } = await supabase
-    .from("stock")
+  const { data, error } = await supabaseAdmin
+    .from("stocks")
     .select("*")
     .eq("product_id", productId)
     .single();
@@ -61,8 +64,8 @@ export const findByProductId = async (productId: string) => {
 };
 
 export const upsert = async (productId: string, dto: UpdateStockDTO) => {
-  const { data, error } = await supabase
-    .from("stock")
+  const { data, error } = await supabaseAdmin
+    .from("stocks")
     .upsert(
       {
         product_id: productId,
@@ -79,7 +82,7 @@ export const upsert = async (productId: string, dto: UpdateStockDTO) => {
 };
 
 export const getStats = async () => {
-  const { data, error } = await supabase.from("stock").select("quantity");
+  const { data, error } = await supabaseAdmin.from("stocks").select("quantity");
 
   if (error) throw new AppError(error.message, 500);
 

@@ -6,9 +6,9 @@ const db = supabaseAdmin as any;
 
 const selectFields = `
   *,
-  affiliate:affiliates ( id, name, email ),
-  product:products ( id, name, price, image_url ),
-  order:orders ( id, status, created_at )
+  affiliates!affiliate_id ( id, name, email ),
+  products!product_id ( id, name, price, image_url ),
+  orders!order_id ( id, status, created_at )
 `;
 
 // ── Record sales for a confirmed/delivered order ───────────────────────────────
@@ -114,13 +114,24 @@ export const findAllPaginated = async (
   const filtered = search
     ? (data ?? []).filter(
         (s: any) =>
-          s.affiliate?.name?.toLowerCase().includes(search.toLowerCase()) ||
-          s.product?.name?.toLowerCase().includes(search.toLowerCase()),
+          s.affiliates?.name?.toLowerCase().includes(search.toLowerCase()) ||
+          s.products?.name?.toLowerCase().includes(search.toLowerCase()),
       )
     : (data ?? []);
 
+  // Rename embedded fields to match expected structure
+  const renamed = (filtered ?? []).map((s: any) => ({
+    ...s,
+    affiliate: s.affiliates,
+    product: s.products,
+    order: s.orders,
+    affiliates: undefined,
+    products: undefined,
+    orders: undefined,
+  }));
+
   return {
-    data: filtered,
+    data: renamed,
     meta: {
       total: count ?? 0,
       page,
@@ -138,7 +149,16 @@ export const findById = async (id: string) => {
     .single();
 
   if (error) throw new AppError("Affiliate sale not found", 404);
-  return data;
+  // Rename embedded fields to match expected structure
+  return {
+    ...data,
+    affiliate: data?.affiliates,
+    product: data?.products,
+    order: data?.orders,
+    affiliates: undefined,
+    products: undefined,
+    orders: undefined,
+  };
 };
 
 export const updateStatus = async (id: string, status: AffiliateSaleStatus) => {
@@ -150,7 +170,16 @@ export const updateStatus = async (id: string, status: AffiliateSaleStatus) => {
     .single();
 
   if (error) throw new AppError("Affiliate sale not found", 404);
-  return data;
+  // Rename embedded fields to match expected structure
+  return {
+    ...data,
+    affiliate: data?.affiliates,
+    product: data?.products,
+    order: data?.orders,
+    affiliates: undefined,
+    products: undefined,
+    orders: undefined,
+  };
 };
 
 export const remove = async (id: string) => {

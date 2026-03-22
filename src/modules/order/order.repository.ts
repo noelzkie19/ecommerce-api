@@ -1,7 +1,17 @@
 import { supabaseAdmin } from "../../config/supabase";
 import { AppError } from "../../common/utils/AppError";
-import { CartOwner } from "../cart/cart.types";
-import { CreateOrderDTO, OrderStatus, PaymentStatus } from "./order.types";
+import type { CartOwner } from "../cart/cart.repository";
+import type { OrderStatus, PaymentStatus } from "../../domain/entities/Order";
+
+interface CreateOrderDTO {
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  shippingAddress: string;
+  orderNotes?: string;
+  paymentMethod: string;
+  discount?: number;
+}
 
 type StockRow = { id: string; quantity: number };
 type OrderItemRow = { product_id: string; quantity: number };

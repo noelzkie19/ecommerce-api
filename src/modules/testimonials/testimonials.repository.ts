@@ -1,10 +1,22 @@
 import { supabaseAdmin } from "../../config/supabase";
 import { AppError } from "../../common/utils/AppError";
-import {
-  CreateTestimonialDTO,
-  UpdateTestimonialDTO,
-  TestimonialStatus,
-} from "./testimonials.type";
+
+type TestimonialStatus = "pending" | "approved" | "rejected";
+
+interface CreateTestimonialDTO {
+  customerName: string;
+  location?: string | null;
+  rating: number;
+  message: string;
+}
+
+interface UpdateTestimonialDTO {
+  customerName?: string;
+  location?: string;
+  rating?: number;
+  message?: string;
+  status?: TestimonialStatus;
+}
 
 const SELECT_WITH_PRODUCT = `
   id,

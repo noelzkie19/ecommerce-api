@@ -53,7 +53,10 @@ export class ProductImage {
       productId: this.productId,
       url: this.url,
       position: this.position,
-      createdAt: this.createdAt.toISOString(),
+      createdAt:
+        this.createdAt && !Number.isNaN(this.createdAt.getTime())
+          ? this.createdAt.toISOString()
+          : null,
     };
   }
 }
@@ -273,8 +276,14 @@ export class Product {
       hasDiscount: this.hasDiscount(),
       discountPercentage: Math.round(this.getDiscountPercentage()),
       images: this.images.map((img) => img.toResponse()),
-      createdAt: this.createdAt.toISOString(),
-      updatedAt: this.updatedAt.toISOString(),
+      createdAt:
+        this.createdAt && !Number.isNaN(this.createdAt.getTime())
+          ? this.createdAt.toISOString()
+          : null,
+      updatedAt:
+        this.updatedAt && !Number.isNaN(this.updatedAt.getTime())
+          ? this.updatedAt.toISOString()
+          : null,
     };
   }
 
@@ -441,8 +450,8 @@ export interface ProductResponse {
   hasDiscount: boolean;
   discountPercentage: number;
   images: ProductImageResponse[];
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**
@@ -453,5 +462,5 @@ export interface ProductImageResponse {
   productId: string;
   url: string;
   position: number;
-  createdAt: string;
+  createdAt: string | null;
 }

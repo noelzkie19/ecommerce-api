@@ -1,6 +1,15 @@
 import { supabaseAdmin } from "../../config/supabase";
 import { AppError } from "../../common/utils/AppError";
-import { AddToCartDTO, CartOwner } from "./cart.types";
+
+export interface CartOwner {
+  userId?: string;
+  guestId?: string;
+}
+
+interface AddToCartDTO {
+  productId: string;
+  quantity: number;
+}
 
 const ownerFilter = (query: any, owner: CartOwner) => {
   if (owner.userId) return query.eq("user_id", owner.userId);
