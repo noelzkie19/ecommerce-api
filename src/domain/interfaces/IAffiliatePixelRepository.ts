@@ -18,7 +18,7 @@ import {
  */
 export interface CreatePixelEventInput {
   affiliateId: string;
-  orderId: string;
+  orderId?: string; // Optional for ViewContent, AddToCart, InitiateCheckout events
   eventType: MetaEventType;
   pixelId: string;
   eventId: string;
