@@ -4,10 +4,11 @@
  * Updates the status of an affiliate sale.
  */
 
-/**
- * Status of an affiliate sale
- */
-export type AffiliateSaleStatus = "pending" | "approved" | "rejected";
+import {
+  IAffiliateSalesRepository,
+  AffiliateSaleStatus,
+} from "../../../domain/interfaces/IAffiliateSalesRepository";
+import { resolve, TOKENS } from "../../../di/container";
 
 /**
  * Input DTO for UpdateAffiliateSaleStatusUseCase
@@ -50,6 +51,14 @@ export interface UpdateAffiliateSaleStatusOutput {
  * Updates the status of an affiliate sale.
  */
 export class UpdateAffiliateSaleStatusUseCase {
+  private readonly affiliateSalesRepository: IAffiliateSalesRepository;
+
+  constructor(affiliateSalesRepository?: IAffiliateSalesRepository) {
+    this.affiliateSalesRepository =
+      affiliateSalesRepository ??
+      resolve<IAffiliateSalesRepository>(TOKENS.IAffiliateSalesRepository);
+  }
+
   /**
    * Execute the use case
    */
@@ -58,11 +67,7 @@ export class UpdateAffiliateSaleStatusUseCase {
   ): Promise<UpdateAffiliateSaleStatusOutput> {
     const { id, status } = input;
 
-    // Dynamic import to avoid circular dependencies
-    const { updateStatus } =
-      await import("../../../modules/affiliates-sales/affiliate-sales.repository");
-
-    const sale = await updateStatus(id, status);
+    const sale = await this.affiliateSalesRepository.updateStatus(id, status);
 
     return sale;
   }

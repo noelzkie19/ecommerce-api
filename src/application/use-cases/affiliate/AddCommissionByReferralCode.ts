@@ -4,9 +4,9 @@
  * Adds commission to affiliate by referral code.
  */
 
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
 import { supabaseAdmin } from "../../../config/supabase";
-import { AppError } from "../../../common/utils/AppError";
+import { resolve, TOKENS } from "../../../di/container";
 
 /**
  * Input DTO for AddCommissionByReferralCodeUseCase
@@ -28,24 +28,29 @@ export interface AddCommissionByReferralCodeOutput {
  * Add Commission By Referral Code Use Case
  */
 export class AddCommissionByReferralCodeUseCase {
+  private readonly affiliateRepository: IAffiliateRepository;
+
+  constructor(affiliateRepository?: IAffiliateRepository) {
+    this.affiliateRepository =
+      affiliateRepository ??
+      resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+  }
+
   /**
    * Execute the use case
    */
   async execute(
     input: AddCommissionByReferralCodeInput,
   ): Promise<AddCommissionByReferralCodeOutput> {
-    const referrer = await affiliateRepository.findByAffiliateLink(
+    const referrer = await this.affiliateRepository.findByAffiliateLink(
       input.referralCode,
     );
 
     if (!referrer) {
-      throw new AppError(
-        "Affiliate not found for code: " + input.referralCode,
-        404,
-      );
+      throw new Error("Affiliate not found for code: " + input.referralCode);
     }
 
-    const settings = await affiliateRepository.getSettings();
+    const settings = await this.affiliateRepository.getSettings();
 
     const { referralCommissionRate, referralCommissionType } = settings;
     const registrationFee = settings.registrationFee;
@@ -73,7 +78,7 @@ export class AddCommissionByReferralCodeUseCase {
 
     return {
       affiliateId: referrer.id,
-      affiliateLink: referrer.affiliate_link ?? "",
+      affiliateLink: referrer.affiliateLink ?? "",
       commissionAmount,
     };
   }

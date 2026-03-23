@@ -107,7 +107,10 @@ export class User {
       fullName: this.fullName,
       role: this.role,
       affiliateId: this._affiliateId,
-      createdAt: this.createdAt.toISOString(),
+      createdAt:
+        this.createdAt && !Number.isNaN(this.createdAt.getTime())
+          ? this.createdAt.toISOString()
+          : null,
     };
   }
 
@@ -163,5 +166,5 @@ export interface UserResponse {
   fullName: string;
   role: UserRole;
   affiliateId: string | null;
-  createdAt: string;
+  createdAt: string | null;
 }

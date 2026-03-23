@@ -5,6 +5,8 @@
  */
 
 export type { IAffiliateRepository } from "./IAffiliateRepository";
+export type { IAffiliatePixelRepository } from "./IAffiliatePixelRepository";
+export type { IAffiliateTrackingRepository } from "./IAffiliateTrackingRepository";
 export type {
   IAuthRepository,
   AuthResponse,
@@ -21,6 +23,9 @@ export type {
   CreateOrderItem,
 } from "./IOrderRepository";
 export type { IProductRepository } from "./IProductRepository";
+export type { IStockRepository } from "./IStockRepository";
+export type { ITestimonialRepository } from "./ITestimonialRepository";
+export type { IWishlistRepository } from "./IWishlistRepository";
 export type { ICourseRepository } from "./ICourseRepository";
 export type {
   ICommunityLinkRepository,
@@ -37,3 +42,15 @@ export type {
   AffiliateProduct,
   AffiliateSettings,
 } from "./IAffiliateRepository";
+export type {
+  CreatePixelEventInput,
+  FailedPixelEvent,
+  PixelEventStats,
+} from "./IAffiliatePixelRepository";
+export type {
+  TrackingLinkWithAffiliate,
+  AttributionRecord,
+  TrackingStats,
+  PaginatedTrackingLinks,
+  PaginatedAttributions,
+} from "./IAffiliateTrackingRepository";

@@ -252,8 +252,14 @@ export class Course {
       isActive: this.isActive,
       viewsCount: this.viewsCount,
       embedUrl: this.getEmbedUrl(),
-      createdAt: this.createdAt.toISOString(),
-      updatedAt: this.updatedAt.toISOString(),
+      createdAt:
+        this.createdAt && !Number.isNaN(this.createdAt.getTime())
+          ? this.createdAt.toISOString()
+          : null,
+      updatedAt:
+        this.updatedAt && !Number.isNaN(this.updatedAt.getTime())
+          ? this.updatedAt.toISOString()
+          : null,
     };
   }
 
@@ -380,8 +386,8 @@ export interface CourseResponse {
   isActive: boolean;
   viewsCount: number;
   embedUrl: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**

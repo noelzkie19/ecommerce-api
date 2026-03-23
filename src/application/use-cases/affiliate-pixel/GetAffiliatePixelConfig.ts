@@ -1,4 +1,6 @@
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
+import { AppError } from "../../../common/utils/AppError";
 import { ConversionValueType } from "./index";
 
 export interface GetAffiliatePixelConfigInput {
@@ -18,16 +20,24 @@ export interface AffiliatePixelConfigOutput {
 export const getAffiliatePixelConfig = async (
   input: GetAffiliatePixelConfigInput,
 ): Promise<AffiliatePixelConfigOutput> => {
+  // Resolve repository from DI container
+  const affiliateRepository = resolve<IAffiliateRepository>(
+    "IAffiliateRepository",
+  );
+
   const affiliate = await affiliateRepository.findById(input.affiliateId);
+
+  if (!affiliate) {
+    throw new AppError("Affiliate not found", 404);
+  }
 
   return {
     affiliateId: affiliate.id,
-    pixelId: affiliate.pixel_id || "",
-    pixelAccessToken: affiliate.pixel_access_token,
-    enablePurchaseEvent: affiliate.enable_purchase_event,
-    enableLeadEvent: affiliate.enable_lead_event,
-    conversionValueType:
-      (affiliate.conversion_value_type as ConversionValueType) || "sale_amount",
-    conversionValueFixed: affiliate.conversion_value_fixed,
+    pixelId: affiliate.pixelId || "",
+    pixelAccessToken: affiliate.pixelAccessToken || undefined,
+    enablePurchaseEvent: affiliate.enablePurchaseEvent,
+    enableLeadEvent: affiliate.enableLeadEvent,
+    conversionValueType: affiliate.conversionValueType || "sale_amount",
+    conversionValueFixed: affiliate.conversionValueFixed || undefined,
   };
 };

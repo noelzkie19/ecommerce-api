@@ -4,7 +4,8 @@
  * Manually sets the referrer for an affiliate (for testing/admin purposes).
  */
 
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
+import { resolve, TOKENS } from "../../../di/container";
 
 /**
  * Input DTO for SetAffiliateReferrerUseCase
@@ -18,11 +19,19 @@ export interface SetAffiliateReferrerInput {
  * Set Affiliate Referrer Use Case
  */
 export class SetAffiliateReferrerUseCase {
+  private readonly affiliateRepository: IAffiliateRepository;
+
+  constructor(affiliateRepository?: IAffiliateRepository) {
+    this.affiliateRepository =
+      affiliateRepository ??
+      resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+  }
+
   /**
    * Execute the use case
    */
   async execute(input: SetAffiliateReferrerInput): Promise<void> {
-    await affiliateRepository.updateReferredBy(
+    await this.affiliateRepository.updateReferredBy(
       input.affiliateId,
       input.referrerId,
     );

@@ -30,7 +30,7 @@ export interface GetCourseOutput {
   isPremium: boolean;
   viewsCount: number;
   embedUrl: string;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 /**

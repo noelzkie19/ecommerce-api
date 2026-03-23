@@ -1,4 +1,5 @@
-import * as trackingRepository from "../../../modules/affiliate-tracking/affiliate-tracking.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliateTrackingRepository } from "../../../domain/interfaces/IAffiliateTrackingRepository";
 
 export interface DeleteTrackingLinkInput {
   id: string;
@@ -7,5 +8,8 @@ export interface DeleteTrackingLinkInput {
 export const deleteTrackingLink = async (
   input: DeleteTrackingLinkInput,
 ): Promise<void> => {
-  await trackingRepository.deleteTrackingLink(input.id);
+  const trackingRepo = resolve<IAffiliateTrackingRepository>(
+    "IAffiliateTrackingRepository",
+  );
+  await trackingRepo.deleteTrackingLink(input.id);
 };

@@ -39,10 +39,10 @@ export interface GetProductOutput {
     productId: string;
     url: string;
     position: number;
-    createdAt: string;
+    createdAt: string | null;
   }>;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**

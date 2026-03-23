@@ -166,6 +166,44 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
   }
 
   /**
+   * Create an affiliate record directly from auth user data
+   * Used for auto-creating missing affiliate records for existing users
+   */
+  async createForAuthUser(
+    userId: string,
+    email: string,
+    name: string,
+    referredBy?: string,
+  ): Promise<Affiliate> {
+    const storeId = `store_${Math.random().toString(36).substring(2, 10).toLowerCase()}`;
+
+    const { data, error } = await db
+      .from("affiliates")
+      .insert({
+        user_id: userId,
+        name,
+        email,
+        status: "pending",
+        payment_status: "unpaid",
+        store_id: storeId,
+        referred_by: referredBy ?? null,
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        // Already exists — fetch and return it
+        const existing = await this.findByUserId(userId);
+        if (existing) return existing;
+      }
+      throw new AppError(error.message, 500);
+    }
+
+    return Affiliate.fromDatabase(data);
+  }
+
+  /**
    * Update an affiliate
    */
   async update(

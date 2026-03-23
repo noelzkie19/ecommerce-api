@@ -270,8 +270,14 @@ export class Order {
       trackingMethod: this.trackingMethod,
       clickId: this.clickId,
       items: this._items.map((item) => item.toResponse()),
-      createdAt: this.createdAt.toISOString(),
-      updatedAt: this.updatedAt.toISOString(),
+      createdAt:
+        this.createdAt && !Number.isNaN(this.createdAt.getTime())
+          ? this.createdAt.toISOString()
+          : null,
+      updatedAt:
+        this.updatedAt && !Number.isNaN(this.updatedAt.getTime())
+          ? this.updatedAt.toISOString()
+          : null,
     };
   }
 
@@ -460,8 +466,8 @@ export interface OrderResponse {
   trackingMethod: string | null;
   clickId: string | null;
   items: OrderItemResponse[];
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**

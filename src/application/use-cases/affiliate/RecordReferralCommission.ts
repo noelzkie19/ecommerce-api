@@ -4,8 +4,9 @@
  * Records commission for referring a new affiliate.
  */
 
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
 import { supabaseAdmin } from "../../../config/supabase";
+import { resolve, TOKENS } from "../../../di/container";
 
 /**
  * Input DTO for RecordReferralCommissionUseCase
@@ -27,24 +28,31 @@ export interface RecordReferralCommissionOutput {
  * Record Referral Commission Use Case
  */
 export class RecordReferralCommissionUseCase {
+  private readonly affiliateRepository: IAffiliateRepository;
+
+  constructor(affiliateRepository?: IAffiliateRepository) {
+    this.affiliateRepository =
+      affiliateRepository ??
+      resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+  }
+
   /**
    * Execute the use case
    */
   async execute(
     input: RecordReferralCommissionInput,
   ): Promise<RecordReferralCommissionOutput | null> {
-    const referredAffiliate = await affiliateRepository.findById(
+    const referredAffiliate = await this.affiliateRepository.findById(
       input.referredAffiliateId,
     );
 
-    const referrerId =
-      referredAffiliate?.referredBy ?? referredAffiliate?.referred_by;
+    const referrerId = referredAffiliate?.referredBy;
 
     if (!referrerId) {
       return null;
     }
 
-    const settings = await affiliateRepository.getSettings();
+    const settings = await this.affiliateRepository.getSettings();
     const { referralCommissionRate, referralCommissionType } = settings;
 
     const commissionAmount =
@@ -54,7 +62,8 @@ export class RecordReferralCommissionUseCase {
 
     if (commissionAmount <= 0) return null;
 
-    const referrerAffiliate = await affiliateRepository.findById(referrerId);
+    const referrerAffiliate =
+      await this.affiliateRepository.findById(referrerId);
     const currentAffiliateCommission =
       referrerAffiliate?.affiliateCommission ?? 0;
 

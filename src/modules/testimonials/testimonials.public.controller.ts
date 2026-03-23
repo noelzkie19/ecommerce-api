@@ -2,7 +2,15 @@ import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
 import { AppError } from "../../common/utils/AppError";
-import * as testimonialService from "./testimonials.service";
+import { resolve, TOKENS } from "../../di/container";
+import { ITestimonialRepository } from "../../domain/interfaces/ITestimonialRepository";
+
+/**
+ * Get testimonial repository instance
+ */
+function getTestimonialRepository(): ITestimonialRepository {
+  return resolve<ITestimonialRepository>(TOKENS.ITestimonialRepository);
+}
 
 export const getApprovedTestimonials = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
@@ -11,10 +19,8 @@ export const getApprovedTestimonials = catchAsync(
       100,
       Math.max(1, Number.parseInt(req.query.limit as string) || 10),
     );
-    const result = await testimonialService.getApprovedTestimonials(
-      page,
-      limit,
-    );
+    const testimonialRepo = getTestimonialRepository();
+    const result = await testimonialRepo.findAllApproved(page, limit);
     sendSuccess(res, result);
   },
 );
@@ -27,7 +33,8 @@ export const submitTestimonial = catchAsync(
     if (!rating) throw new AppError("rating is required", 400);
     if (!message) throw new AppError("message is required", 400);
 
-    const created = await testimonialService.submitTestimonial({
+    const testimonialRepo = getTestimonialRepository();
+    const created = await testimonialRepo.create({
       customerName,
       location: location ?? null,
       rating: Number(rating),

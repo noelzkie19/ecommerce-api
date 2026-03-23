@@ -45,7 +45,7 @@ export interface ProductImageOutput {
   productId: string;
   url: string;
   position: number;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 /**

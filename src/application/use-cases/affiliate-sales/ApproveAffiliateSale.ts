@@ -4,10 +4,9 @@
  * Approves an affiliate sale and updates affiliate totals.
  */
 
-/**
- * Status of an affiliate sale
- */
-export type AffiliateSaleStatus = "pending" | "approved" | "rejected";
+import { IAffiliateSalesRepository } from "../../../domain/interfaces/IAffiliateSalesRepository";
+import { resolve, TOKENS } from "../../../di/container";
+import { UpdateAffiliateTotalsUseCase } from "../affiliate/index";
 
 /**
  * Input DTO for ApproveAffiliateSaleUseCase
@@ -49,6 +48,14 @@ export interface ApproveAffiliateSaleOutput {
  * Approves an affiliate sale and updates affiliate totals.
  */
 export class ApproveAffiliateSaleUseCase {
+  private readonly affiliateSalesRepository: IAffiliateSalesRepository;
+
+  constructor(affiliateSalesRepository?: IAffiliateSalesRepository) {
+    this.affiliateSalesRepository =
+      affiliateSalesRepository ??
+      resolve<IAffiliateSalesRepository>(TOKENS.IAffiliateSalesRepository);
+  }
+
   /**
    * Execute the use case
    */
@@ -57,20 +64,20 @@ export class ApproveAffiliateSaleUseCase {
   ): Promise<ApproveAffiliateSaleOutput> {
     const { id } = input;
 
-    // Dynamic import to avoid circular dependencies
-    const { findById, updateStatus } =
-      await import("../../../modules/affiliates-sales/affiliate-sales.repository");
-
     // Get the sale first to get the affiliateId and amounts
-    const sale = await findById(id);
+    const sale = await this.affiliateSalesRepository.findById(id);
+
+    if (!sale) {
+      throw new Error("Affiliate sale not found");
+    }
 
     // Update status to approved
-    const updated = await updateStatus(id, "approved" as AffiliateSaleStatus);
+    const updated = await this.affiliateSalesRepository.updateStatus(
+      id,
+      "approved",
+    );
 
     // Update affiliate's total sales and commissions
-    // We'll use the use case instead of service
-    const { UpdateAffiliateTotalsUseCase } =
-      await import("../affiliate/index.js");
     const updateTotalsUseCase = new UpdateAffiliateTotalsUseCase();
     await updateTotalsUseCase.execute({
       affiliateId: sale.affiliateId,

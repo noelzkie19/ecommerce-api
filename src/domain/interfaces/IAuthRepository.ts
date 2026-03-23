@@ -75,6 +75,14 @@ export interface AuthUserInfo {
 }
 
 /**
+ * Update profile data
+ */
+export interface UpdateProfileData {
+  fullName?: string;
+  avatarUrl?: string;
+}
+
+/**
  * IAuthRepository Interface
  *
  * Defines the contract for authentication operations.
@@ -134,4 +142,14 @@ export interface IAuthRepository {
    * Verify access token validity
    */
   verifyToken(accessToken: string): Promise<boolean>;
+
+  /**
+   * Find user by ID (admin)
+   */
+  findById(id: string): Promise<any>;
+
+  /**
+   * Update user profile
+   */
+  updateProfile(id: string, data: UpdateProfileData): Promise<any>;
 }

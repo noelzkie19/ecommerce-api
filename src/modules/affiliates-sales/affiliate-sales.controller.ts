@@ -14,6 +14,7 @@ import {
   UpdateAffiliateSaleStatusUseCase,
   ApproveAffiliateSaleUseCase,
   RejectAffiliateSaleUseCase,
+  DeleteAffiliateSaleUseCase,
   AffiliateSaleStatus,
 } from "../../application/use-cases/affiliate-sales";
 
@@ -106,9 +107,8 @@ export const rejectSale = catchAsync(async (req: Request, res: Response) => {
 export const deleteSale = catchAsync(async (req: Request, res: Response) => {
   const id = String(req.params.id);
 
-  // Dynamic import to avoid circular dependencies
-  const { remove } = await import("./affiliate-sales.repository");
-  await remove(id);
+  const useCase = new DeleteAffiliateSaleUseCase();
+  await useCase.execute({ id });
 
   res.status(204).send();
 });

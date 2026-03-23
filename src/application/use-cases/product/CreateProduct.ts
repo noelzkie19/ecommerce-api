@@ -45,7 +45,7 @@ export interface CreateProductOutput {
   originalPriceFormatted: string | null;
   hasDiscount: boolean;
   discountPercentage: number;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 /**

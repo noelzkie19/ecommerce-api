@@ -1,4 +1,5 @@
-import { supabaseAdmin } from "../../../config/supabase";
+import { resolve } from "../../../di/container";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
 import { AppError } from "../../../common/utils/AppError";
 import { ConversionValueType } from "./index";
 
@@ -25,36 +26,57 @@ export interface UpdateAffiliatePixelConfigOutput {
 export const updateAffiliatePixelConfig = async (
   input: UpdateAffiliatePixelConfigInput,
 ): Promise<UpdateAffiliatePixelConfigOutput> => {
-  const updates: Record<string, any> = {};
+  // Resolve repository from DI container
+  const affiliateRepository = resolve<IAffiliateRepository>(
+    "IAffiliateRepository",
+  );
 
-  if (input.pixelId !== undefined) updates.pixel_id = input.pixelId;
+  // Check if affiliate exists
+  const affiliate = await affiliateRepository.findById(input.affiliateId);
+
+  if (!affiliate) {
+    throw new AppError("Affiliate not found", 404);
+  }
+
+  // Build update data
+  const updateData: Partial<{
+    pixel_id: string;
+    pixel_access_token: string;
+    enable_purchase_event: boolean;
+    enable_lead_event: boolean;
+    conversion_value_type: ConversionValueType;
+    conversion_value_fixed: number;
+  }> = {};
+
+  if (input.pixelId !== undefined) updateData.pixel_id = input.pixelId;
   if (input.pixelAccessToken !== undefined)
-    updates.pixel_access_token = input.pixelAccessToken;
+    updateData.pixel_access_token = input.pixelAccessToken;
   if (input.enablePurchaseEvent !== undefined)
-    updates.enable_purchase_event = input.enablePurchaseEvent;
+    updateData.enable_purchase_event = input.enablePurchaseEvent;
   if (input.enableLeadEvent !== undefined)
-    updates.enable_lead_event = input.enableLeadEvent;
+    updateData.enable_lead_event = input.enableLeadEvent;
   if (input.conversionValueType !== undefined)
-    updates.conversion_value_type = input.conversionValueType;
+    updateData.conversion_value_type = input.conversionValueType;
   if (input.conversionValueFixed !== undefined)
-    updates.conversion_value_fixed = input.conversionValueFixed;
+    updateData.conversion_value_fixed = input.conversionValueFixed;
 
-  const { error } = await supabaseAdmin
-    .from("affiliates")
-    .update(updates)
-    .eq("id", input.affiliateId);
-
-  if (error) throw new AppError(error.message, 500);
+  // Update affiliate using repository
+  await affiliateRepository.update(input.affiliateId, updateData as any);
 
   // Return updated config
   return {
     affiliateId: input.affiliateId,
-    pixelId: input.pixelId || "",
-    pixelAccessToken: input.pixelAccessToken,
-    enablePurchaseEvent: input.enablePurchaseEvent ?? false,
-    enableLeadEvent: input.enableLeadEvent ?? false,
+    pixelId: input.pixelId || affiliate.pixelId || "",
+    pixelAccessToken:
+      input.pixelAccessToken || affiliate.pixelAccessToken || undefined,
+    enablePurchaseEvent:
+      input.enablePurchaseEvent ?? affiliate.enablePurchaseEvent,
+    enableLeadEvent: input.enableLeadEvent ?? affiliate.enableLeadEvent,
     conversionValueType:
-      (input.conversionValueType as ConversionValueType) || "sale-amount",
-    conversionValueFixed: input.conversionValueFixed,
+      (input.conversionValueType as ConversionValueType) ||
+      affiliate.conversionValueType ||
+      "sale_amount",
+    conversionValueFixed:
+      input.conversionValueFixed ?? affiliate.conversionValueFixed ?? undefined,
   };
 };

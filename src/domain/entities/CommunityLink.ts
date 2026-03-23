@@ -173,8 +173,14 @@ export class CommunityLink {
       imageUrl: this.imageUrl,
       orderIndex: this.orderIndex,
       isActive: this.isActive,
-      createdAt: this.createdAt.toISOString(),
-      updatedAt: this.updatedAt.toISOString(),
+      createdAt:
+        this.createdAt && !Number.isNaN(this.createdAt.getTime())
+          ? this.createdAt.toISOString()
+          : null,
+      updatedAt:
+        this.updatedAt && !Number.isNaN(this.updatedAt.getTime())
+          ? this.updatedAt.toISOString()
+          : null,
     };
   }
 
@@ -244,8 +250,8 @@ export interface CommunityLinkResponse {
   imageUrl: string | null;
   orderIndex: number;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**

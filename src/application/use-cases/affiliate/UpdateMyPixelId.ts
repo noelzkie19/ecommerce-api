@@ -4,7 +4,8 @@
  * Updates the pixel ID for an affiliate.
  */
 
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
+import { resolve, TOKENS } from "../../../di/container";
 
 /**
  * Input DTO for UpdateMyPixelIdUseCase
@@ -24,19 +25,27 @@ export interface UpdateMyPixelIdOutput {
   email: string;
   name: string;
   storeId: string | null;
-  pixelId: string;
-  createdAt: string;
+  pixelId: string | null;
+  createdAt: string | null;
 }
 
 /**
  * Update My Pixel ID Use Case
  */
 export class UpdateMyPixelIdUseCase {
+  private readonly affiliateRepository: IAffiliateRepository;
+
+  constructor(affiliateRepository?: IAffiliateRepository) {
+    this.affiliateRepository =
+      affiliateRepository ??
+      resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+  }
+
   /**
    * Execute the use case
    */
   async execute(input: UpdateMyPixelIdInput): Promise<UpdateMyPixelIdOutput> {
-    const affiliate = await affiliateRepository.updatePixelByUserId(
+    const affiliate = await this.affiliateRepository.updatePixelByUserId(
       input.userId,
       input.pixelId,
     );
@@ -44,12 +53,15 @@ export class UpdateMyPixelIdUseCase {
     return {
       id: affiliate.id,
       status: affiliate.status,
-      paymentStatus: affiliate.payment_status,
+      paymentStatus: affiliate.paymentStatus,
       email: affiliate.email,
       name: affiliate.name,
-      storeId: affiliate.store_id,
-      pixelId: affiliate.pixel_id,
-      createdAt: affiliate.created_at,
+      storeId: affiliate.storeId,
+      pixelId: affiliate.pixelId,
+      createdAt:
+        affiliate.createdAt instanceof Date
+          ? affiliate.createdAt.toISOString()
+          : affiliate.createdAt,
     };
   }
 }

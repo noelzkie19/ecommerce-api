@@ -1,4 +1,5 @@
-import * as trackingRepository from "../../../modules/affiliate-tracking/affiliate-tracking.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliateTrackingRepository } from "../../../domain/interfaces/IAffiliateTrackingRepository";
 
 export interface UpdateTrackingLinkInput {
   id: string;
@@ -30,10 +31,35 @@ export interface TrackingLinkData {
 export const updateTrackingLink = async (
   input: UpdateTrackingLinkInput,
 ): Promise<TrackingLinkData> => {
-  return trackingRepository.updateTrackingLink(input.id, {
+  const trackingRepo = resolve<IAffiliateTrackingRepository>(
+    "IAffiliateTrackingRepository",
+  );
+
+  const link = await trackingRepo.updateTrackingLink(input.id, {
     campaignName: input.campaignName,
     landingPageUrl: input.landingPageUrl,
     expiresAt: input.expiresAt,
     isActive: input.isActive,
   });
+
+  return {
+    id: link.id,
+    affiliateId: link.affiliate_id,
+    storeId: link.store_id,
+    campaignName: link.campaign_name ?? undefined,
+    landingPageUrl: link.landing_page_url ?? undefined,
+    clickCount: link.click_count,
+    conversionCount: link.conversion_count,
+    createdAt: link.created_at,
+    expiresAt: link.expires_at ?? undefined,
+    isActive: link.is_active,
+    affiliate: link.affiliate
+      ? {
+          id: link.affiliate.id,
+          name: link.affiliate.name,
+          email: link.affiliate.email,
+          pixelId: link.affiliate.pixel_id ?? undefined,
+        }
+      : undefined,
+  };
 };
