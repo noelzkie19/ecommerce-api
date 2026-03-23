@@ -16,6 +16,8 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url(),
   BACKEND_URL: z.string().url(),
   AFFILIATE_REGISTRATION_FEE: z.string().default("999"),
+  META_PIXEL_ID: z.string().optional(),
+  META_ACCESS_TOKEN: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

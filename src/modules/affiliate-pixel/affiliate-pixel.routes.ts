@@ -4,14 +4,19 @@ import * as pixelController from "./affiliate-pixel.controller";
 
 const router = Router();
 
-// All pixel routes require authentication
+// ── Public Test Endpoint ───────────────────────────────────────────────
+// Test pixel config - no auth required for easier testing
+router.post("/pixel/test", pixelController.testPixelConfig);
+
+// ── Protected Routes ─────────────────────────────────────────────────
+// All other pixel routes require authentication
 router.use(requireAuth);
 
 // ── Pixel Configuration ─────────────────────────────────────────────────
 
 /**
  * @openapi
- * /api/affiliates/{id}/pixel-config:
+ * /api/affiliate-pixel/affiliates/{id}/pixel-config:
  *   get:
  *     tags: [Affiliate Pixel]
  *     summary: Get pixel configuration for an affiliate
@@ -32,7 +37,7 @@ router.get("/affiliates/:id/pixel-config", pixelController.getPixelConfig);
 
 /**
  * @openapi
- * /api/affiliates/{id}/pixel-config:
+ * /api/affiliate-pixel/affiliates/{id}/pixel-config:
  *   patch:
  *     tags: [Affiliate Pixel]
  *     summary: Update pixel configuration for an affiliate
@@ -73,12 +78,10 @@ router.patch("/affiliates/:id/pixel-config", pixelController.updatePixelConfig);
 
 /**
  * @openapi
- * /api/pixel/test:
+ * /api/affiliate-pixel/pixel/test:
  *   post:
  *     tags: [Affiliate Pixel]
- *     summary: Test pixel configuration
- *     security:
- *       - bearerAuth: []
+ *     summary: Test pixel configuration (public - no auth required)
  *     requestBody:
  *       required: true
  *       content:
@@ -90,8 +93,10 @@ router.patch("/affiliates/:id/pixel-config", pixelController.updatePixelConfig);
  *             properties:
  *               pixelId:
  *                 type: string
+ *                 example: "1101803511857717"
  *               testEventCode:
  *                 type: string
+ *                 example: "TEST5494"
  *     responses:
  *       200:
  *         description: Test result
@@ -102,7 +107,7 @@ router.post("/pixel/test", pixelController.testPixelConfig);
 
 /**
  * @openapi
- * /api/affiliates/{id}/pixel-events:
+ * /api/affiliate-pixel/affiliates/{id}/pixel-events:
  *   get:
  *     tags: [Affiliate Pixel]
  *     summary: Get pixel events for an affiliate
@@ -123,7 +128,7 @@ router.get("/affiliates/:id/pixel-events", pixelController.getPixelEvents);
 
 /**
  * @openapi
- * /api/pixel/fire-purchase:
+ * /api/affiliate-pixel/pixel/fire-purchase:
  *   post:
  *     tags: [Affiliate Pixel]
  *     summary: Fire a purchase event manually
@@ -153,7 +158,7 @@ router.post("/pixel/fire-purchase", pixelController.firePurchaseEvent);
 
 /**
  * @openapi
- * /api/pixel/fire-lead:
+ * /api/affiliate-pixel/pixel/fire-lead:
  *   post:
  *     tags: [Affiliate Pixel]
  *     summary: Fire a lead event manually
@@ -185,7 +190,7 @@ router.post("/pixel/fire-lead", pixelController.fireLeadEvent);
 
 /**
  * @openapi
- * /api/pixel/retry-failed:
+ * /api/affiliate-pixel/pixel/retry-failed:
  *   post:
  *     tags: [Affiliate Pixel]
  *     summary: Retry sending failed pixel events

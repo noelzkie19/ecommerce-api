@@ -4,7 +4,8 @@
  * Updates affiliate settings.
  */
 
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
+import { resolve, TOKENS } from "../../../di/container";
 
 /**
  * Input DTO for UpdateAffiliateSettingsUseCase
@@ -28,28 +29,33 @@ export interface UpdateAffiliateSettingsOutput {
  * Update Affiliate Settings Use Case
  */
 export class UpdateAffiliateSettingsUseCase {
+  private readonly affiliateRepository: IAffiliateRepository;
+
+  constructor(affiliateRepository?: IAffiliateRepository) {
+    this.affiliateRepository =
+      affiliateRepository ??
+      resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+  }
+
   /**
    * Execute the use case
    */
   async execute(
     input: UpdateAffiliateSettingsInput,
   ): Promise<UpdateAffiliateSettingsOutput> {
-    const updates: Record<string, unknown> = {};
+    const updates: Record<string, number | string> = {};
 
     if (input.registrationFee !== undefined) {
-      updates.registration_fee = input.registrationFee;
+      updates.registrationFee = input.registrationFee;
     }
     if (input.referralCommissionRate !== undefined) {
-      updates.referral_commission_rate = input.referralCommissionRate;
+      updates.referralCommissionRate = input.referralCommissionRate;
     }
     if (input.referralCommissionType !== undefined) {
-      updates.referral_commission_type = input.referralCommissionType;
+      updates.referralCommissionType = input.referralCommissionType;
     }
 
-    // Note: Need to add updateSettings to repository
-    // For now, this is a placeholder that would need repository update
-
-    const settings = await affiliateRepository.getSettings();
+    const settings = await this.affiliateRepository.updateSettings(updates);
     return {
       registrationFee: settings.registrationFee,
       referralCommissionRate: settings.referralCommissionRate,

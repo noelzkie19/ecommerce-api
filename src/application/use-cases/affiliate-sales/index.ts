@@ -78,3 +78,8 @@ export {
   type RejectAffiliateSaleInput,
   type RejectAffiliateSaleOutput,
 } from "./RejectAffiliateSale";
+
+export {
+  DeleteAffiliateSaleUseCase,
+  type DeleteAffiliateSaleInput,
+} from "./DeleteAffiliateSale";

@@ -1,5 +1,6 @@
-import * as trackingRepository from "../../../modules/affiliate-tracking/affiliate-tracking.repository";
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
+import { IAffiliateTrackingRepository } from "../../../domain/interfaces/IAffiliateTrackingRepository";
 import { AppError } from "../../../common/utils/AppError";
 
 export interface AttributeOrderInput {
@@ -33,15 +34,25 @@ export interface AttributionData {
 export const attributeOrder = async (
   input: AttributeOrderInput,
 ): Promise<AttributionData> => {
+  // Resolve repositories from DI container
+  const affiliateRepo = resolve<IAffiliateRepository>("IAffiliateRepository");
+  const trackingRepo = resolve<IAffiliateTrackingRepository>(
+    "IAffiliateTrackingRepository",
+  );
+
   // Validate affiliate exists
-  const affiliate = await affiliateRepository.findById(input.affiliateId);
+  const affiliate = await affiliateRepo.findById(input.affiliateId);
+
+  if (!affiliate) {
+    throw new AppError("Affiliate not found", 404);
+  }
 
   if (affiliate.status !== "active") {
     throw new AppError("Cannot attribute order to inactive affiliate", 400);
   }
 
   // Create attribution in database
-  const attribution = await trackingRepository.attributeOrderToAffiliate({
+  const attribution = await trackingRepo.attributeOrderToAffiliate({
     orderId: input.orderId,
     affiliateId: input.affiliateId,
     trackingMethod: "manual",
@@ -49,12 +60,22 @@ export const attributeOrder = async (
   });
 
   // Increment conversion count
-  if (affiliate.store_id) {
-    await trackingRepository.incrementConversionCount(
+  if (affiliate.storeId) {
+    await trackingRepo.incrementConversionCount(
       input.affiliateId,
-      affiliate.store_id,
+      affiliate.storeId,
     );
   }
 
-  return attribution;
+  return {
+    id: attribution.id,
+    orderId: attribution.order_id,
+    affiliateId: attribution.affiliate_id ?? undefined,
+    trackingMethod: attribution.tracking_method,
+    pixelId: attribution.pixel_id ?? undefined,
+    storeId: attribution.store_id ?? undefined,
+    clickId: attribution.click_id ?? undefined,
+    referrerUrl: attribution.referrer_url ?? undefined,
+    createdAt: attribution.created_at,
+  };
 };

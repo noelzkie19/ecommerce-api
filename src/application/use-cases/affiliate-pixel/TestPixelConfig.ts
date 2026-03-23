@@ -1,7 +1,16 @@
+import * as crypto from "node:crypto";
 import { AppError } from "../../../common/utils/AppError";
 
 const META_GRAPH_API_VERSION = "v18.0";
 const META_CONVERSIONS_URL = `https://graph.facebook.com/${META_GRAPH_API_VERSION}`;
+
+// Hash function for Meta API (SHA256)
+const hashData = (data: string): string => {
+  return crypto
+    .createHash("sha256")
+    .update(data.toLowerCase().trim())
+    .digest("hex");
+};
 
 export interface TestPixelConfigInput {
   pixelId: string;
@@ -27,17 +36,21 @@ export const testPixelConfig = async (
 
   const url = `${META_CONVERSIONS_URL}/${input.pixelId}/events`;
 
-  // Build a simple test event
+  // Build a simple test event with correct Meta API format
+  // Must include at least one customer information parameter
   const testEvent = {
-    eventName: "PageView",
-    eventTime: Math.floor(Date.now() / 1000),
-    eventId: `test_${Date.now()}`,
-    userData: {},
-    customData: {
+    event_name: "PageView",
+    event_time: Math.floor(Date.now() / 1000),
+    event_id: `test_${Date.now()}`,
+    user_data: {
+      // At least one customer info parameter required - must be SHA256 hashed
+      em: [hashData("test@example.com")], // SHA256 hashed email
+    },
+    custom_data: {
       value: 0,
       currency: "PHP",
     },
-    actionSource: "WEBSITE",
+    action_source: "website",
   };
 
   // Add test event code if provided
@@ -77,7 +90,7 @@ export const testPixelConfig = async (
     if (result.error) {
       return {
         success: false,
-        eventId: testEvent.eventId,
+        eventId: testEvent.event_id,
         pixelId: input.pixelId,
         error: result.error.message,
         response: result,
@@ -86,7 +99,7 @@ export const testPixelConfig = async (
 
     return {
       success: true,
-      eventId: testEvent.eventId,
+      eventId: testEvent.event_id,
       pixelId: input.pixelId,
       response: result,
     };
@@ -95,7 +108,7 @@ export const testPixelConfig = async (
       error instanceof Error ? error.message : "Unknown error";
     return {
       success: false,
-      eventId: testEvent.eventId,
+      eventId: testEvent.event_id,
       pixelId: input.pixelId,
       error: errorMessage,
     };

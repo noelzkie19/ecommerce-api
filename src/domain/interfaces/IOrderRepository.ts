@@ -14,6 +14,7 @@ import {
   CreateOrderProps,
 } from "../entities/Order";
 import { PaginatedResult } from "./IAffiliateRepository";
+import type { CartOwner } from "./ICartRepository";
 
 /**
  * Order repository interface
@@ -83,6 +84,28 @@ export interface IOrderRepository {
    * Restore stock for cancelled order
    */
   restoreStock(orderId: string): Promise<void>;
+
+  /**
+   * Find order by ID with items and products (for controller)
+   */
+  findOrderById(id: string): Promise<any>;
+
+  /**
+   * Find orders by owner with items and products (for controller)
+   */
+  findOrdersByOwner(owner: CartOwner): Promise<any[]>;
+
+  /**
+   * Find all orders with pagination and items (for controller)
+   */
+  findAllOrders(
+    page: number,
+    limit: number,
+    status?: OrderStatus,
+  ): Promise<{
+    data: any[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }>;
 }
 
 /**

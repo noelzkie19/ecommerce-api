@@ -4,10 +4,11 @@
  * Retrieves a paginated list of affiliate sales.
  */
 
-/**
- * Status of an affiliate sale
- */
-export type AffiliateSaleStatus = "pending" | "approved" | "rejected";
+import {
+  IAffiliateSalesRepository,
+  AffiliateSaleStatus,
+} from "../../../domain/interfaces/IAffiliateSalesRepository";
+import { resolve, TOKENS } from "../../../di/container";
 
 /**
  * Input DTO for ListAffiliateSalesUseCase
@@ -61,6 +62,14 @@ export interface ListAffiliateSalesOutput {
  * Retrieves a paginated list of affiliate sales.
  */
 export class ListAffiliateSalesUseCase {
+  private readonly affiliateSalesRepository: IAffiliateSalesRepository;
+
+  constructor(affiliateSalesRepository?: IAffiliateSalesRepository) {
+    this.affiliateSalesRepository =
+      affiliateSalesRepository ??
+      resolve<IAffiliateSalesRepository>(TOKENS.IAffiliateSalesRepository);
+  }
+
   /**
    * Execute the use case
    */
@@ -69,11 +78,7 @@ export class ListAffiliateSalesUseCase {
   ): Promise<ListAffiliateSalesOutput> {
     const { page = 1, limit = 20, affiliateId, status, search } = input;
 
-    // Dynamic import to avoid circular dependencies
-    const { findAllPaginated } =
-      await import("../../../modules/affiliates-sales/affiliate-sales.repository");
-
-    const result = await findAllPaginated(
+    const result = await this.affiliateSalesRepository.findAllPaginated(
       page,
       limit,
       affiliateId,

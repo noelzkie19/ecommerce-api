@@ -4,9 +4,10 @@
  * Creates a payment intent for affiliate registration fee.
  */
 
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
+import { CreateAffiliateProps } from "../../../domain/entities/Affiliate";
 import * as paymongoUtils from "../../../utils/paymongo.utils";
-import { AppError } from "../../../common/utils/AppError";
+import { resolve, TOKENS } from "../../../di/container";
 
 /**
  * Input DTO for CreateAffiliatePaymentUseCase
@@ -31,6 +32,14 @@ export interface CreateAffiliatePaymentOutput {
  * Create Affiliate Payment Use Case
  */
 export class CreateAffiliatePaymentUseCase {
+  private readonly affiliateRepository: IAffiliateRepository;
+
+  constructor(affiliateRepository?: IAffiliateRepository) {
+    this.affiliateRepository =
+      affiliateRepository ??
+      resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+  }
+
   /**
    * Execute the use case
    */
@@ -38,32 +47,40 @@ export class CreateAffiliatePaymentUseCase {
     input: CreateAffiliatePaymentInput,
   ): Promise<CreateAffiliatePaymentOutput> {
     // Find or create affiliate record
-    let affiliate = await affiliateRepository.findByUserId(input.userId);
+    let affiliate = await this.affiliateRepository.findByUserId(input.userId);
 
     if (!affiliate) {
       // Create new affiliate record with pending status
-      affiliate = await affiliateRepository.create({
+      const createProps: CreateAffiliateProps = {
+        id: crypto.randomUUID(),
+        userId: input.userId,
         email: input.email,
+        name: input.fullName || input.email.split("@")[0],
         status: "pending",
-      });
+        paymentStatus: "unpaid",
+      };
+      affiliate = await this.affiliateRepository.create(createProps);
     }
 
     // Check if already paid
-    if (affiliate.payment_status === "paid") {
-      throw new AppError("Affiliate registration fee already paid", 400);
+    if (affiliate.paymentStatus === "paid") {
+      throw new Error("Affiliate registration fee already paid");
     }
 
     // FIX: Persist referred_by as early as possible
     if (input.affiliateLink) {
-      const existingReferredBy = affiliate.referred_by ?? null;
+      const existingReferredBy = affiliate.referredBy;
 
       if (!existingReferredBy) {
-        const referrer = await affiliateRepository.findByAffiliateLink(
+        const referrer = await this.affiliateRepository.findByAffiliateLink(
           input.affiliateLink,
         );
 
         if (referrer && referrer.id !== affiliate.id) {
-          await affiliateRepository.updateReferredBy(affiliate.id, referrer.id);
+          await this.affiliateRepository.updateReferredBy(
+            affiliate.id,
+            referrer.id,
+          );
         }
       }
     }

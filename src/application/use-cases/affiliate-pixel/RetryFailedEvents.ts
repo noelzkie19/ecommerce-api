@@ -1,4 +1,5 @@
-import * as pixelRepository from "../../../modules/affiliate-pixel/affiliate-pixel.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliatePixelRepository } from "../../../domain/interfaces/IAffiliatePixelRepository";
 
 const META_GRAPH_API_VERSION = "v18.0";
 const META_CONVERSIONS_URL = `https://graph.facebook.com/${META_GRAPH_API_VERSION}`;
@@ -65,6 +66,11 @@ const sendPixelEvent = async (
 export const retryFailedEvents = async (
   input: RetryFailedEventsInput = {},
 ): Promise<RetryFailedEventsOutput> => {
+  // Resolve repository from DI container
+  const pixelRepository = resolve<IAffiliatePixelRepository>(
+    "IAffiliatePixelRepository",
+  );
+
   const limit = input.limit ?? 10;
   const failedEvents = await pixelRepository.getFailedEvents(limit);
 
@@ -82,7 +88,7 @@ export const retryFailedEvents = async (
       event.id,
       result.success ? "sent" : "failed",
       result.response,
-      result.success ? event.retry_count + 1 : event.retry_count,
+      result.success ? (event.retry_count || 0) + 1 : event.retry_count || 0,
     );
   }
 

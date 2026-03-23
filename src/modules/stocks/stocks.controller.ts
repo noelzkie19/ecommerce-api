@@ -1,7 +1,15 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
-import * as stockRepository from "./stocks.repository";
+import { resolve, TOKENS } from "../../di/container";
+import { IStockRepository } from "../../domain/interfaces/IStockRepository";
+
+/**
+ * Get stock repository instance
+ */
+function getStockRepository(): IStockRepository {
+  return resolve<IStockRepository>(TOKENS.IStockRepository);
+}
 
 export const getAllStock = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
@@ -12,9 +20,10 @@ export const getAllStock = catchAsync(
       Math.max(1, Number.parseInt(req.query.limit as string) || 10),
     );
 
+    const stockRepo = getStockRepository();
     const [{ data, meta }, stats] = await Promise.all([
-      stockRepository.findAll({ search }, page, limit),
-      stockRepository.getStats(),
+      stockRepo.findAll({ search }, page, limit),
+      stockRepo.getStats(),
     ]);
 
     sendSuccess(res, { stock: data, stats, meta });
@@ -24,7 +33,8 @@ export const getAllStock = catchAsync(
 export const updateStock = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const productId = String(req.params.productId);
-    const updated = await stockRepository.upsert(productId, req.body);
+    const stockRepo = getStockRepository();
+    const updated = await stockRepo.upsert(productId, req.body);
     sendSuccess(res, updated, "Stock updated successfully");
   },
 );
@@ -32,7 +42,8 @@ export const updateStock = catchAsync(
 export const getStockByProductId = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const productId = String(req.params.productId);
-    const stock = await stockRepository.findByProductId(productId);
+    const stockRepo = getStockRepository();
+    const stock = await stockRepo.findByProductId(productId);
     sendSuccess(res, stock);
   },
 );
@@ -44,7 +55,8 @@ export const getStockByProductId = catchAsync(
 export const getStockAvailability = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const productId = String(req.params.productId);
-    const stock = await stockRepository.findByProductId(productId);
+    const stockRepo = getStockRepository();
+    const stock = await stockRepo.findByProductId(productId);
 
     // Return only availability status - not the actual quantity
     const isAvailable = stock && stock.quantity > 0;

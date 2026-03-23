@@ -7,6 +7,7 @@
 
 export type AffiliateStatus = "pending" | "active" | "suspended";
 export type PaymentStatus = "paid" | "unpaid";
+export type ConversionValueType = "sale_amount" | "commission" | "fixed";
 
 /**
  * Affiliate entity with business logic
@@ -21,6 +22,11 @@ export class Affiliate {
   readonly affiliateLink: string | null;
   readonly storeId: string | null;
   readonly pixelId: string | null;
+  readonly pixelAccessToken: string | null;
+  readonly enablePurchaseEvent: boolean;
+  readonly enableLeadEvent: boolean;
+  readonly conversionValueType: ConversionValueType;
+  readonly conversionValueFixed: number | null;
   readonly referredBy: string | null;
   readonly totalSales: number;
   readonly totalCommissions: number;
@@ -38,6 +44,11 @@ export class Affiliate {
     this.affiliateLink = props.affiliateLink;
     this.storeId = props.storeId;
     this.pixelId = props.pixelId;
+    this.pixelAccessToken = props.pixelAccessToken ?? null;
+    this.enablePurchaseEvent = props.enablePurchaseEvent ?? false;
+    this.enableLeadEvent = props.enableLeadEvent ?? false;
+    this.conversionValueType = props.conversionValueType ?? "sale_amount";
+    this.conversionValueFixed = props.conversionValueFixed ?? null;
     this.referredBy = props.referredBy;
     this.totalSales = props.totalSales;
     this.totalCommissions = props.totalCommissions;
@@ -60,6 +71,11 @@ export class Affiliate {
       affiliateLink: props.affiliateLink ?? null,
       storeId: props.storeId ?? null,
       pixelId: props.pixelId ?? null,
+      pixelAccessToken: props.pixelAccessToken ?? null,
+      enablePurchaseEvent: props.enablePurchaseEvent ?? false,
+      enableLeadEvent: props.enableLeadEvent ?? false,
+      conversionValueType: props.conversionValueType ?? "sale_amount",
+      conversionValueFixed: props.conversionValueFixed ?? null,
       referredBy: props.referredBy ?? null,
       totalSales: props.totalSales ?? 0,
       totalCommissions: props.totalCommissions ?? 0,
@@ -82,7 +98,12 @@ export class Affiliate {
       paymentStatus: row.payment_status,
       affiliateLink: row.affiliate_link,
       storeId: row.store_id,
-      pixelId: row.pixel_id,
+      pixelId: row.pixel_id ?? null,
+      pixelAccessToken: (row as any).pixel_access_token ?? null,
+      enablePurchaseEvent: (row as any).enable_purchase_event ?? false,
+      enableLeadEvent: (row as any).enable_lead_event ?? false,
+      conversionValueType: (row as any).conversion_value_type ?? "sale_amount",
+      conversionValueFixed: (row as any).conversion_value_fixed ?? null,
       referredBy: row.referred_by,
       totalSales: row.total_sales ?? 0,
       totalCommissions: row.total_commissions ?? 0,
@@ -175,6 +196,11 @@ export class Affiliate {
       affiliateLink: this.affiliateLink,
       storeId: this.storeId,
       pixelId: this.pixelId,
+      pixelAccessToken: this.pixelAccessToken,
+      enablePurchaseEvent: this.enablePurchaseEvent,
+      enableLeadEvent: this.enableLeadEvent,
+      conversionValueType: this.conversionValueType,
+      conversionValueFixed: this.conversionValueFixed,
       referredBy: this.referredBy,
       totalSales: this.totalSales,
       totalCommissions: this.totalCommissions,
@@ -201,6 +227,11 @@ export class Affiliate {
       affiliateLink: this.affiliateLink,
       storeId: this.storeId,
       pixelId: this.pixelId,
+      pixelAccessToken: this.pixelAccessToken,
+      enablePurchaseEvent: this.enablePurchaseEvent,
+      enableLeadEvent: this.enableLeadEvent,
+      conversionValueType: this.conversionValueType,
+      conversionValueFixed: this.conversionValueFixed,
       referredBy: this.referredBy,
       totalSales: this.totalSales,
       totalCommissions: this.totalCommissions,
@@ -224,6 +255,11 @@ interface AffiliateProps {
   affiliateLink: string | null;
   storeId: string | null;
   pixelId: string | null;
+  pixelAccessToken: string | null;
+  enablePurchaseEvent: boolean;
+  enableLeadEvent: boolean;
+  conversionValueType: ConversionValueType;
+  conversionValueFixed: number | null;
   referredBy: string | null;
   totalSales: number;
   totalCommissions: number;
@@ -245,6 +281,11 @@ export interface CreateAffiliateProps {
   affiliateLink?: string | null;
   storeId?: string | null;
   pixelId?: string | null;
+  pixelAccessToken?: string | null;
+  enablePurchaseEvent?: boolean;
+  enableLeadEvent?: boolean;
+  conversionValueType?: ConversionValueType;
+  conversionValueFixed?: number | null;
   referredBy?: string | null;
   totalSales?: number;
   totalCommissions?: number;
@@ -287,6 +328,11 @@ export interface AffiliateResponse {
   affiliateLink: string | null;
   storeId: string | null;
   pixelId: string | null;
+  pixelAccessToken: string | null;
+  enablePurchaseEvent: boolean;
+  enableLeadEvent: boolean;
+  conversionValueType: ConversionValueType;
+  conversionValueFixed: number | null;
   referredBy: string | null;
   totalSales: number;
   totalCommissions: number;

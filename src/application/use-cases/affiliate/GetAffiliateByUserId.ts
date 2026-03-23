@@ -31,8 +31,8 @@ export interface GetAffiliateByUserIdOutput {
   totalSales: number;
   totalCommissions: number;
   affiliateCommission: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**

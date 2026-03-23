@@ -9,7 +9,15 @@ import {
   validatePaginatedQuery,
 } from "../../common/validators/order.validator";
 import type { OrderStatus } from "../../domain/entities/Order";
-import * as orderRepository from "./order.repository";
+import { resolve, TOKENS } from "../../di/container";
+import { IOrderRepository } from "../../domain/interfaces/IOrderRepository";
+
+/**
+ * Get order repository instance
+ */
+function getOrderRepository(): IOrderRepository {
+  return resolve<IOrderRepository>(TOKENS.IOrderRepository);
+}
 
 const VALID_STATUSES = new Set<OrderStatus>([
   "pending",
@@ -41,7 +49,8 @@ export const getOrder = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateOrderIdParam(req.params);
     const owner = resolveOwner(req, { required: true });
-    const order = await orderRepository.findOrderById(id);
+    const orderRepo = getOrderRepository();
+    const order = await orderRepo.findOrderById(id);
 
     if (!order) throw new AppError("Order not found", 404);
 
@@ -61,7 +70,8 @@ export const getOrder = catchAsync(
 export const getOrders = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const owner = resolveOwner(req, { required: true });
-    const orders = await orderRepository.findOrdersByOwner(owner);
+    const orderRepo = getOrderRepository();
+    const orders = await orderRepo.findOrdersByOwner(owner);
     sendSuccess(res, orders);
   },
 );
@@ -71,7 +81,8 @@ export const getOrders = catchAsync(
 export const getOrderAdmin = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateOrderIdParam(req.params);
-    const order = await orderRepository.findOrderById(id);
+    const orderRepo = getOrderRepository();
+    const order = await orderRepo.findOrderById(id);
     if (!order) throw new AppError("Order not found", 404);
     sendSuccess(res, order);
   },
@@ -88,11 +99,8 @@ export const getAllOrders = catchAsync(
         ? (status as OrderStatus)
         : undefined;
 
-    const result = await orderRepository.findAllOrders(
-      page,
-      limit,
-      validStatus,
-    );
+    const orderRepo = getOrderRepository();
+    const result = await orderRepo.findAllOrders(page, limit, validStatus);
     sendSuccess(res, result);
   },
 );
@@ -104,7 +112,8 @@ export const updateOrderStatus = catchAsync(
     const { id } = validateOrderIdParam(req.params);
     const { status } = validateUpdateOrderStatus(req.body);
 
-    const order = await orderRepository.updateOrderStatus(id, status);
+    const orderRepo = getOrderRepository();
+    const order = await orderRepo.updateStatus(id, status);
     sendSuccess(res, order, "Order status updated successfully");
   },
 );

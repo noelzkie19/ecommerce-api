@@ -12,6 +12,14 @@ import { SupabaseCourseRepository } from "../infrastructure/database/supabase/Su
 import { SupabaseAuthRepository } from "../infrastructure/database/supabase/SupabaseAuthRepository";
 import { SupabaseCommunityLinkRepository } from "../infrastructure/database/supabase/SupabaseCommunityLinkRepository";
 import { SupabaseImageLibraryRepository } from "../infrastructure/database/supabase/SupabaseImageLibraryRepository";
+import { SupabaseAffiliatePixelRepository } from "../infrastructure/database/supabase/SupabaseAffiliatePixelRepository";
+import { SupabaseAffiliateTrackingRepository } from "../infrastructure/database/supabase/SupabaseAffiliateTrackingRepository";
+import { SupabaseAffiliateSalesRepository } from "../infrastructure/database/supabase/SupabaseAffiliateSalesRepository";
+import { SupabaseCartRepository } from "../infrastructure/database/supabase/SupabaseCartRepository";
+import { SupabaseOrderRepository } from "../infrastructure/database/supabase/SupabaseOrderRepository";
+import { SupabaseStockRepository } from "../infrastructure/database/supabase/SupabaseStockRepository";
+import { SupabaseTestimonialRepository } from "../infrastructure/database/supabase/SupabaseTestimonialRepository";
+import { SupabaseWishlistRepository } from "../infrastructure/database/supabase/SupabaseWishlistRepository";
 
 /**
  * Dependency Container
@@ -61,6 +69,29 @@ class Container {
       "IImageLibraryRepository",
       new SupabaseImageLibraryRepository(),
     );
+    this.dependencies.set(
+      "IAffiliatePixelRepository",
+      new SupabaseAffiliatePixelRepository(),
+    );
+    this.dependencies.set(
+      "IAffiliateTrackingRepository",
+      new SupabaseAffiliateTrackingRepository(),
+    );
+    this.dependencies.set(
+      "IAffiliateSalesRepository",
+      new SupabaseAffiliateSalesRepository(),
+    );
+    this.dependencies.set("ICartRepository", new SupabaseCartRepository());
+    this.dependencies.set("IOrderRepository", new SupabaseOrderRepository());
+    this.dependencies.set("IStockRepository", new SupabaseStockRepository());
+    this.dependencies.set(
+      "ITestimonialRepository",
+      new SupabaseTestimonialRepository(),
+    );
+    this.dependencies.set(
+      "IWishlistRepository",
+      new SupabaseWishlistRepository(),
+    );
   }
 
   /**
@@ -109,7 +140,14 @@ export function register<T>(token: string, implementation: T): void {
 // Export tokens for type-safe dependency resolution
 export const TOKENS = {
   IAffiliateRepository: "IAffiliateRepository",
+  IAffiliatePixelRepository: "IAffiliatePixelRepository",
+  IAffiliateTrackingRepository: "IAffiliateTrackingRepository",
+  IAffiliateSalesRepository: "IAffiliateSalesRepository",
+  ICartRepository: "ICartRepository",
   IOrderRepository: "IOrderRepository",
+  IStockRepository: "IStockRepository",
+  ITestimonialRepository: "ITestimonialRepository",
+  IWishlistRepository: "IWishlistRepository",
   IProductRepository: "IProductRepository",
   ICourseRepository: "ICourseRepository",
   IAuthRepository: "IAuthRepository",

@@ -71,6 +71,17 @@ export interface IAffiliateRepository {
   create(props: CreateAffiliateProps): Promise<Affiliate>;
 
   /**
+   * Create an affiliate record directly from auth user data
+   * Used for auto-creating missing affiliate records for existing users
+   */
+  createForAuthUser(
+    userId: string,
+    email: string,
+    name: string,
+    referredBy?: string,
+  ): Promise<Affiliate>;
+
+  /**
    * Update an affiliate
    */
   update(id: string, data: Partial<CreateAffiliateProps>): Promise<Affiliate>;

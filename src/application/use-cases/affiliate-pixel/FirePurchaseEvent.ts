@@ -1,6 +1,7 @@
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
-import * as trackingRepository from "../../../modules/affiliate-tracking/affiliate-tracking.repository";
-import * as pixelRepository from "../../../modules/affiliate-pixel/affiliate-pixel.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
+import { IAffiliatePixelRepository } from "../../../domain/interfaces/IAffiliatePixelRepository";
+import { IAffiliateTrackingRepository } from "../../../domain/interfaces/IAffiliateTrackingRepository";
 import {
   buildPurchaseEvent,
   sendPixelEvent,
@@ -17,18 +18,33 @@ export interface FirePurchaseEventInput {
 export const firePurchaseEvent = async (
   input: FirePurchaseEventInput,
 ): Promise<SendPixelEventResult> => {
+  // Resolve repositories from DI container
+  const affiliateRepository = resolve<IAffiliateRepository>(
+    "IAffiliateRepository",
+  );
+  const pixelRepository = resolve<IAffiliatePixelRepository>(
+    "IAffiliatePixelRepository",
+  );
+  const trackingRepository = resolve<IAffiliateTrackingRepository>(
+    "IAffiliateTrackingRepository",
+  );
+
   // Get affiliate with pixel config
   const affiliate = await affiliateRepository.findById(input.affiliateId);
 
-  if (!affiliate.pixel_id) {
+  if (!affiliate) {
+    throw new AppError("Affiliate not found", 404);
+  }
+
+  if (!affiliate.pixelId) {
     throw new AppError("Affiliate does not have a pixel ID configured", 400);
   }
 
-  if (!affiliate.enable_purchase_event) {
+  if (!affiliate.enablePurchaseEvent) {
     return {
       success: false,
       eventId: "",
-      pixelId: affiliate.pixel_id,
+      pixelId: affiliate.pixelId,
       error: "Purchase events are disabled for this affiliate",
     };
   }
@@ -57,7 +73,7 @@ export const firePurchaseEvent = async (
 
   // Calculate value based on affiliate config
   let value = order.total;
-  if (affiliate.conversion_value_type === "commission") {
+  if (affiliate.conversionValueType === "commission") {
     // Calculate commission from affiliate_sales
     const { data: sales } = await supabaseAdmin
       .from("affiliate_sales")
@@ -69,10 +85,10 @@ export const firePurchaseEvent = async (
       value = sales.reduce((sum, s) => sum + (s.commission_earned || 0), 0);
     }
   } else if (
-    affiliate.conversion_value_type === "fixed" &&
-    affiliate.conversion_value_fixed
+    affiliate.conversionValueType === "fixed" &&
+    affiliate.conversionValueFixed
   ) {
-    value = affiliate.conversion_value_fixed;
+    value = affiliate.conversionValueFixed;
   }
 
   // Build the event
@@ -92,19 +108,19 @@ export const firePurchaseEvent = async (
     customerLastName: order.full_name?.split(" ").slice(1).join(" "),
     clientIp: undefined,
     userAgent: undefined,
-    fbc: attribution?.click_id,
+    fbc: (attribution as any)?.click_id || undefined,
     fbp: undefined,
     productItems,
     eventSourceUrl: process.env.FRONTEND_URL || undefined,
-    pixelId: affiliate.pixel_id,
-    storeId: affiliate.store_id,
+    pixelId: affiliate.pixelId,
+    storeId: affiliate.storeId || undefined,
   });
 
   // Send the event
   const result = await sendPixelEvent(
     event,
-    affiliate.pixel_id,
-    affiliate.pixel_access_token,
+    affiliate.pixelId,
+    affiliate.pixelAccessToken || undefined,
   );
 
   // Log the event
@@ -112,7 +128,7 @@ export const firePurchaseEvent = async (
     affiliateId: input.affiliateId,
     orderId: input.orderId,
     eventType: "Purchase",
-    pixelId: affiliate.pixel_id,
+    pixelId: affiliate.pixelId,
     eventId: event.eventId,
     eventData: {
       value,

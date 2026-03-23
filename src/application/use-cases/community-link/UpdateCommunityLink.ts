@@ -35,8 +35,8 @@ export interface UpdateCommunityLinkOutput {
   imageUrl: string | null;
   orderIndex: number;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**

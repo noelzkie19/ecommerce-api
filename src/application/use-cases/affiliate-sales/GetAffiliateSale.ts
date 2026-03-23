@@ -4,6 +4,9 @@
  * Retrieves a single affiliate sale by ID.
  */
 
+import { IAffiliateSalesRepository } from "../../../domain/interfaces/IAffiliateSalesRepository";
+import { resolve, TOKENS } from "../../../di/container";
+
 /**
  * Input DTO for GetAffiliateSaleUseCase
  */
@@ -44,17 +47,25 @@ export interface GetAffiliateSaleOutput {
  * Retrieves a single affiliate sale by ID.
  */
 export class GetAffiliateSaleUseCase {
+  private readonly affiliateSalesRepository: IAffiliateSalesRepository;
+
+  constructor(affiliateSalesRepository?: IAffiliateSalesRepository) {
+    this.affiliateSalesRepository =
+      affiliateSalesRepository ??
+      resolve<IAffiliateSalesRepository>(TOKENS.IAffiliateSalesRepository);
+  }
+
   /**
    * Execute the use case
    */
   async execute(input: GetAffiliateSaleInput): Promise<GetAffiliateSaleOutput> {
     const { id } = input;
 
-    // Dynamic import to avoid circular dependencies
-    const { findById } =
-      await import("../../../modules/affiliates-sales/affiliate-sales.repository");
+    const sale = await this.affiliateSalesRepository.findById(id);
 
-    const sale = await findById(id);
+    if (!sale) {
+      throw new Error("Affiliate sale not found");
+    }
 
     return sale;
   }

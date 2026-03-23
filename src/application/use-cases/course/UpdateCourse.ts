@@ -43,7 +43,7 @@ export interface UpdateCourseOutput {
   isPremium: boolean;
   viewsCount: number;
   embedUrl: string;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 /**

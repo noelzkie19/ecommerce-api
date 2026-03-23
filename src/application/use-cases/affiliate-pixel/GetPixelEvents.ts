@@ -1,4 +1,5 @@
-import * as pixelRepository from "../../../modules/affiliate-pixel/affiliate-pixel.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliatePixelRepository } from "../../../domain/interfaces/IAffiliatePixelRepository";
 import { PaginationMeta } from "../../../common/types";
 
 export interface GetPixelEventsInput {
@@ -42,6 +43,11 @@ export const getPixelEvents = async (
 ): Promise<GetPixelEventsOutput> => {
   const page = input.page ?? 1;
   const limit = input.limit ?? 20;
+
+  // Resolve repository from DI container
+  const pixelRepository = resolve<IAffiliatePixelRepository>(
+    "IAffiliatePixelRepository",
+  );
 
   return pixelRepository.getPixelEventsByAffiliate(
     input.affiliateId,

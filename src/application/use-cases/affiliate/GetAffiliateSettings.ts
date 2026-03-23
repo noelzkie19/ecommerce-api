@@ -4,7 +4,8 @@
  * Retrieves affiliate settings.
  */
 
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
 
 /**
  * Output DTO for GetAffiliateSettingsUseCase
@@ -25,7 +26,8 @@ export class GetAffiliateSettingsUseCase {
    * Execute the use case
    */
   async execute(): Promise<GetAffiliateSettingsOutput> {
-    const settings = await affiliateRepository.getSettings();
+    const affiliateRepo = resolve<IAffiliateRepository>("IAffiliateRepository");
+    const settings = await affiliateRepo.getSettings();
     return {
       registrationFee: settings.registrationFee,
       referralCommissionRate: settings.referralCommissionRate,

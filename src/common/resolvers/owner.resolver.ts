@@ -1,6 +1,6 @@
 import { Request } from "express";
 import { AppError } from "../utils/AppError";
-import { CartOwner } from "../../modules/cart/cart.types";
+import type { CartOwner } from "../../domain/interfaces/ICartRepository";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -16,8 +16,18 @@ import {
   PasswordResetData,
   NewPasswordData,
   AuthUserInfo,
+  UpdateProfileData,
 } from "../../../domain/interfaces/IAuthRepository";
 import { User, UserRole } from "../../../domain/entities/User";
+import { resolve, TOKENS } from "../../../di/container";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
+
+/**
+ * Get affiliate repository instance using DI
+ */
+function getAffiliateRepository(): IAffiliateRepository {
+  return resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+}
 
 /**
  * Link a new user's affiliate record to the referrer identified by referralCode.
@@ -27,36 +37,29 @@ async function linkReferral(
   referralCode: string,
 ): Promise<void> {
   try {
-    const {
-      findByAffiliateLink,
-      findByUserId,
-      updateReferredBy,
-      findByStoreId,
-    } = await import("../../../modules/affiliates/affiliate.repository");
+    const affiliateRepo = getAffiliateRepository();
 
     // Try to find referrer by affiliate_link first, then store_id
-    let referrer = await findByAffiliateLink(referralCode);
-    if (!referrer) {
-      referrer = await findByStoreId(referralCode);
-    }
+    let referrer = await affiliateRepo.findByAffiliateLink(referralCode);
+    referrer ??= await affiliateRepo.findByStoreId(referralCode);
 
     if (!referrer) {
       return;
     }
 
     // Wait a bit for the affiliate record to be created (in case of async trigger)
-    let newAffiliate = await findByUserId(newUserId);
+    let newAffiliate = await affiliateRepo.findByUserId(newUserId);
     if (!newAffiliate) {
       // Wait and retry
       await new Promise((resolve) => setTimeout(resolve, 500));
-      newAffiliate = await findByUserId(newUserId);
+      newAffiliate = await affiliateRepo.findByUserId(newUserId);
     }
 
     if (!newAffiliate) {
       return;
     }
 
-    await updateReferredBy(newAffiliate.id, referrer.id);
+    await affiliateRepo.updateReferredBy(newAffiliate.id, referrer.id);
   } catch {
     // Silently fail - referral linking is not critical
   }
@@ -69,11 +72,10 @@ async function getAffiliateStatus(
   userId: string,
 ): Promise<"pending" | "active" | "suspended"> {
   try {
-    const { findByUserId } =
-      await import("../../../modules/affiliates/affiliate.repository");
-    const affiliate = await findByUserId(userId);
+    const affiliateRepo = getAffiliateRepository();
+    const affiliate = await affiliateRepo.findByUserId(userId);
     if (affiliate) {
-      return affiliate.payment_status === "paid" ? affiliate.status : "pending";
+      return affiliate.paymentStatus === "paid" ? affiliate.status : "pending";
     }
   } catch {
     // Silent fail
@@ -111,9 +113,8 @@ export class SupabaseAuthRepository implements IAuthRepository {
     }
 
     // Explicitly create affiliate record for new user
-    const { createForAuthUser } =
-      await import("../../../modules/affiliates/affiliate.repository");
-    await createForAuthUser(
+    const affiliateRepo = getAffiliateRepository();
+    await affiliateRepo.createForAuthUser(
       authData.user.id,
       authData.user.email ?? "",
       data.fullName ?? (authData.user.email ?? "").split("@")[0],
@@ -288,9 +289,8 @@ export class SupabaseAuthRepository implements IAuthRepository {
 
       // Explicitly create affiliate record for new Google user
       try {
-        const { createForAuthUser } =
-          await import("../../../modules/affiliates/affiliate.repository");
-        await createForAuthUser(
+        const affiliateRepo = getAffiliateRepository();
+        await affiliateRepo.createForAuthUser(
           user.id,
           user.email ?? "",
           data.fullName ?? (user.email ?? "").split("@")[0],
@@ -398,5 +398,29 @@ export class SupabaseAuthRepository implements IAuthRepository {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Find user by ID (admin)
+   */
+  async findById(id: string): Promise<any> {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(id);
+    if (error) throw new AppError("User not found", 404);
+    return data.user;
+  }
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(id: string, data: UpdateProfileData): Promise<any> {
+    const { data: updated, error } =
+      await supabaseAdmin.auth.admin.updateUserById(id, {
+        user_metadata: {
+          full_name: data.fullName,
+          avatar_url: data.avatarUrl,
+        },
+      });
+    if (error) throw new AppError(error.message, 400);
+    return updated.user;
   }
 }

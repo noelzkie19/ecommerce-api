@@ -1,4 +1,5 @@
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
 
 export interface ResolveRefInput {
   storeId: string;
@@ -14,7 +15,8 @@ export interface ResolveRefOutput {
 export const resolveRef = async (
   input: ResolveRefInput,
 ): Promise<ResolveRefOutput | null> => {
-  const affiliate = await affiliateRepository.findByStoreId(input.storeId);
+  const affiliateRepo = resolve<IAffiliateRepository>("IAffiliateRepository");
+  const affiliate = await affiliateRepo.findByStoreId(input.storeId);
 
   if (!affiliate) {
     return null;
@@ -22,8 +24,8 @@ export const resolveRef = async (
 
   return {
     affiliateId: affiliate.id,
-    pixelId: affiliate.pixel_id ?? null,
-    storeId: affiliate.store_id,
+    pixelId: affiliate.pixelId,
+    storeId: affiliate.storeId || "",
     affiliateName: affiliate.name,
   };
 };

@@ -37,7 +37,7 @@ export interface ListProductsOutput {
     originalPriceFormatted: string | null;
     hasDiscount: boolean;
     discountPercentage: number;
-    createdAt: string;
+    createdAt: string | null;
   }>;
   meta: {
     total: number;

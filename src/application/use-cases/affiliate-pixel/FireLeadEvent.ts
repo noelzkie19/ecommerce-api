@@ -1,5 +1,6 @@
-import * as affiliateRepository from "../../../modules/affiliates/affiliate.repository";
-import * as pixelRepository from "../../../modules/affiliate-pixel/affiliate-pixel.repository";
+import { resolve } from "../../../di/container";
+import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
+import { IAffiliatePixelRepository } from "../../../domain/interfaces/IAffiliatePixelRepository";
 import {
   buildLeadEvent,
   sendPixelEvent,
@@ -16,18 +17,30 @@ export interface FireLeadEventInput {
 export const fireLeadEvent = async (
   input: FireLeadEventInput,
 ): Promise<SendPixelEventResult> => {
+  // Resolve repositories from DI container
+  const affiliateRepository = resolve<IAffiliateRepository>(
+    "IAffiliateRepository",
+  );
+  const pixelRepository = resolve<IAffiliatePixelRepository>(
+    "IAffiliatePixelRepository",
+  );
+
   // Get affiliate with pixel config
   const affiliate = await affiliateRepository.findById(input.affiliateId);
 
-  if (!affiliate.pixel_id) {
+  if (!affiliate) {
+    throw new AppError("Affiliate not found", 404);
+  }
+
+  if (!affiliate.pixelId) {
     throw new AppError("Affiliate does not have a pixel ID configured", 400);
   }
 
-  if (!affiliate.enable_lead_event) {
+  if (!affiliate.enableLeadEvent) {
     return {
       success: false,
       eventId: "",
-      pixelId: affiliate.pixel_id,
+      pixelId: affiliate.pixelId,
       error: "Lead events are disabled for this affiliate",
     };
   }
@@ -53,16 +66,16 @@ export const fireLeadEvent = async (
     customerFirstName: order.full_name?.split(" ")[0],
     customerLastName: order.full_name?.split(" ").slice(1).join(" "),
     eventSourceUrl: process.env.FRONTEND_URL || undefined,
-    pixelId: affiliate.pixel_id,
-    storeId: affiliate.store_id,
+    pixelId: affiliate.pixelId,
+    storeId: affiliate.storeId || undefined,
     leadType: "affiliate_conversion",
   });
 
   // Send the event
   const result = await sendPixelEvent(
     event,
-    affiliate.pixel_id,
-    affiliate.pixel_access_token,
+    affiliate.pixelId,
+    affiliate.pixelAccessToken || undefined,
   );
 
   // Log the event
@@ -70,7 +83,7 @@ export const fireLeadEvent = async (
     affiliateId: input.affiliateId,
     orderId: input.orderId,
     eventType: "Lead",
-    pixelId: affiliate.pixel_id,
+    pixelId: affiliate.pixelId,
     eventId: event.eventId,
     eventData: {
       orderId: order.id,

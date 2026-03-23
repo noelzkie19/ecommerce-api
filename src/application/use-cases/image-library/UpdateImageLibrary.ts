@@ -33,8 +33,8 @@ export interface UpdateImageLibraryOutput {
   description: string | null;
   displayOrder: number;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**
