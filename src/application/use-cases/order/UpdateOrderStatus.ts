@@ -7,7 +7,7 @@
  */
 
 import { IOrderRepository } from "../../../domain/interfaces/IOrderRepository";
-import { OrderResponse, OrderStatus } from "../../../domain/entities/Order";
+import { OrderStatus } from "../../../domain/entities/Order";
 import { resolve, TOKENS } from "../../../di/container";
 import { AppError } from "../../../common/utils/AppError";
 import * as affiliateSalesService from "../../../modules/affiliates-sales/affiliate-sales.repository";
@@ -24,7 +24,44 @@ export interface UpdateOrderStatusInput {
 /**
  * Output DTO for UpdateOrderStatusUseCase
  */
-export type UpdateOrderStatusOutput = OrderResponse;
+export interface UpdateOrderStatusOutput {
+  id: string;
+  userId: string | null;
+  guestId: string | null;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  shippingAddress: string;
+  orderNotes: string | null;
+  paymentMethod: "cod" | "gcash" | "card";
+  paymentStatus: "pending" | "paid" | "failed" | "refunded";
+  status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+  subtotal: number;
+  discount: number;
+  total: number;
+  paymentIntentId: string | null;
+  affiliateId: string | null;
+  trackingMethod: string | null;
+  clickId: string | null;
+  items: Array<{
+    id: string;
+    orderId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+    product: {
+      id: string;
+      name: string;
+      price: number;
+      imageUrl: string | null;
+      primaryImageUrl: string | null;
+      images: Array<{ id: string; url: string; position: number }>;
+    } | null;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * Update Order Status Use Case

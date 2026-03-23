@@ -5,7 +5,7 @@
  */
 
 import { ICartRepository } from "../../../domain/interfaces/ICartRepository";
-import { CartOwner, CartItemResponse } from "../../../domain/entities/CartItem";
+import { CartOwner } from "../../../domain/entities/CartItem";
 import { resolve, TOKENS } from "../../../di/container";
 
 /**
@@ -20,7 +20,15 @@ export interface AddToCartInput {
 /**
  * Output DTO for AddToCartUseCase
  */
-export type AddToCartOutput = CartItemResponse;
+export interface AddToCartOutput {
+  id: string;
+  userId: string | null;
+  guestId: string | null;
+  productId: string;
+  quantity: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * Add To Cart Use Case

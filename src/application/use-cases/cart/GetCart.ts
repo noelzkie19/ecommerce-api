@@ -5,10 +5,7 @@
  */
 
 import { ICartRepository } from "../../../domain/interfaces/ICartRepository";
-import {
-  CartOwner,
-  CartItemWithProductResponse,
-} from "../../../domain/entities/CartItem";
+import { CartOwner } from "../../../domain/entities/CartItem";
 import { resolve, TOKENS } from "../../../di/container";
 
 /**
@@ -22,7 +19,23 @@ export interface GetCartInput {
  * Output DTO for GetCartUseCase
  */
 export interface GetCartOutput {
-  items: CartItemWithProductResponse[];
+  items: Array<{
+    id: string;
+    userId: string | null;
+    guestId: string | null;
+    productId: string;
+    quantity: number;
+    createdAt: string;
+    updatedAt: string;
+    product: {
+      id: string;
+      name: string;
+      price: number;
+      imageUrl: string | null;
+      primaryImageUrl: string | null;
+      images: Array<{ id: string; url: string; position: number }>;
+    } | null;
+  }>;
 }
 
 /**

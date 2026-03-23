@@ -5,7 +5,7 @@
  */
 
 import { ICartRepository } from "../../../domain/interfaces/ICartRepository";
-import { CartOwner, CartItemResponse } from "../../../domain/entities/CartItem";
+import { CartOwner } from "../../../domain/entities/CartItem";
 import { resolve, TOKENS } from "../../../di/container";
 
 /**
@@ -20,7 +20,15 @@ export interface UpdateCartItemInput {
 /**
  * Output DTO for UpdateCartItemUseCase
  */
-export type UpdateCartItemOutput = CartItemResponse;
+export interface UpdateCartItemOutput {
+  id: string;
+  userId: string | null;
+  guestId: string | null;
+  productId: string;
+  quantity: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * Update Cart Item Use Case

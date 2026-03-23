@@ -7,7 +7,6 @@
 
 import { IOrderRepository } from "../../../domain/interfaces/IOrderRepository";
 import { CartOwner } from "../../../domain/entities/CartItem";
-import { OrderResponse } from "../../../domain/entities/Order";
 import { resolve, TOKENS } from "../../../di/container";
 import { AppError } from "../../../common/utils/AppError";
 
@@ -23,7 +22,44 @@ export interface GetOrderByIdInput {
 /**
  * Output DTO for GetOrderByIdUseCase
  */
-export type GetOrderByIdOutput = OrderResponse;
+export interface GetOrderByIdOutput {
+  id: string;
+  userId: string | null;
+  guestId: string | null;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  shippingAddress: string;
+  orderNotes: string | null;
+  paymentMethod: "cod" | "gcash" | "card";
+  paymentStatus: "pending" | "paid" | "failed" | "refunded";
+  status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+  subtotal: number;
+  discount: number;
+  total: number;
+  paymentIntentId: string | null;
+  affiliateId: string | null;
+  trackingMethod: string | null;
+  clickId: string | null;
+  items: Array<{
+    id: string;
+    orderId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+    product: {
+      id: string;
+      name: string;
+      price: number;
+      imageUrl: string | null;
+      primaryImageUrl: string | null;
+      images: Array<{ id: string; url: string; position: number }>;
+    } | null;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * Get Order By ID Use Case
