@@ -6,7 +6,6 @@
  */
 
 import { ITestimonialRepository } from "../../../domain/interfaces/ITestimonialRepository";
-import { TestimonialResponse } from "../../../domain/entities/Testimonial";
 import { resolve, TOKENS } from "../../../di/container";
 import { AppError } from "../../../common/utils/AppError";
 
@@ -21,7 +20,16 @@ export interface UpdateTestimonialStatusInput {
 /**
  * Output DTO for UpdateTestimonialStatusUseCase
  */
-export type UpdateTestimonialStatusOutput = TestimonialResponse;
+export interface UpdateTestimonialStatusOutput {
+  id: string;
+  customerName: string;
+  location: string | null;
+  rating: number;
+  message: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * Update Testimonial Status Use Case

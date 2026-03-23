@@ -5,7 +5,6 @@
  */
 
 import { ITestimonialRepository } from "../../../domain/interfaces/ITestimonialRepository";
-import { TestimonialResponse } from "../../../domain/entities/Testimonial";
 import { resolve, TOKENS } from "../../../di/container";
 
 /**
@@ -21,7 +20,16 @@ export interface CreateTestimonialInput {
 /**
  * Output DTO for CreateTestimonialUseCase
  */
-export type CreateTestimonialOutput = TestimonialResponse;
+export interface CreateTestimonialOutput {
+  id: string;
+  customerName: string;
+  location: string | null;
+  rating: number;
+  message: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * Create Testimonial Use Case

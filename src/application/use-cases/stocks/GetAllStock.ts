@@ -5,7 +5,6 @@
  */
 
 import { IStockRepository } from "../../../domain/interfaces/IStockRepository";
-import { PaginatedStocks } from "../../../domain/entities/Stock";
 import { resolve, TOKENS } from "../../../di/container";
 
 export interface GetAllStockInput {
@@ -15,8 +14,25 @@ export interface GetAllStockInput {
 }
 
 export interface GetAllStockOutput {
-  stock: PaginatedStocks["data"];
-  meta: PaginatedStocks["meta"];
+  stock: Array<{
+    id: string;
+    productId: string;
+    quantity: number;
+    updatedAt: string;
+    product: {
+      id: string;
+      name: string;
+      category: string;
+      price: number;
+      imageUrl: string | null;
+    } | null;
+  }>;
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export class GetAllStockUseCase {

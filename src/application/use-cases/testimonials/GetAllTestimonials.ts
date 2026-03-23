@@ -6,10 +6,7 @@
  */
 
 import { ITestimonialRepository } from "../../../domain/interfaces/ITestimonialRepository";
-import {
-  TestimonialFilters,
-  TestimonialResponse,
-} from "../../../domain/entities/Testimonial";
+import { TestimonialFilters } from "../../../domain/entities/Testimonial";
 import { resolve, TOKENS } from "../../../di/container";
 
 /**
@@ -25,7 +22,16 @@ export interface GetAllTestimonialsInput {
  * Output DTO for GetAllTestimonialsUseCase
  */
 export interface GetAllTestimonialsOutput {
-  testimonials: TestimonialResponse[];
+  testimonials: Array<{
+    id: string;
+    customerName: string;
+    location: string | null;
+    rating: number;
+    message: string;
+    status: "pending" | "approved" | "rejected";
+    createdAt: string;
+    updatedAt: string;
+  }>;
   meta: {
     total: number;
     page: number;

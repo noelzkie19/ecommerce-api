@@ -5,7 +5,6 @@
  */
 
 import { IStockRepository } from "../../../domain/interfaces/IStockRepository";
-import { StockResponse } from "../../../domain/entities/Stock";
 import { AppError } from "../../../common/utils/AppError";
 import { resolve, TOKENS } from "../../../di/container";
 
@@ -13,7 +12,12 @@ export interface GetStockByProductIdInput {
   productId: string;
 }
 
-export type GetStockByProductIdOutput = StockResponse;
+export interface GetStockByProductIdOutput {
+  id: string;
+  productId: string;
+  quantity: number;
+  updatedAt: string;
+}
 
 export class GetStockByProductIdUseCase {
   private readonly stockRepository: IStockRepository;

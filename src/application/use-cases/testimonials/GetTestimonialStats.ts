@@ -5,13 +5,18 @@
  */
 
 import { ITestimonialRepository } from "../../../domain/interfaces/ITestimonialRepository";
-import { TestimonialStats } from "../../../domain/entities/Testimonial";
 import { resolve, TOKENS } from "../../../di/container";
 
 /**
  * Output DTO for GetTestimonialStatsUseCase
  */
-export type GetTestimonialStatsOutput = TestimonialStats;
+export interface GetTestimonialStatsOutput {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  averageRating: number;
+}
 
 /**
  * Get Testimonial Stats Use Case

@@ -5,10 +5,13 @@
  */
 
 import { IStockRepository } from "../../../domain/interfaces/IStockRepository";
-import { StockStats } from "../../../domain/entities/Stock";
 import { resolve, TOKENS } from "../../../di/container";
 
-export type GetStockStatsOutput = StockStats;
+export interface GetStockStatsOutput {
+  totalStock: number;
+  outOfStock: number;
+  lowStock: number;
+}
 
 export class GetStockStatsUseCase {
   private readonly stockRepository: IStockRepository;
