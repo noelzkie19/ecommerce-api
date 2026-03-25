@@ -12,7 +12,7 @@ export type OrderStatus =
   | "shipped"
   | "delivered"
   | "cancelled";
-export type PaymentMethod = "cod" | "gcash" | "card";
+export type PaymentMethod = "cod" | "maya";
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
 /**

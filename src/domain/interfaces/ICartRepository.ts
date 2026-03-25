@@ -43,6 +43,10 @@ export interface CartItem {
       url: string;
       position: number;
     }>;
+    stock?: {
+      quantity: number;
+      available: boolean;
+    };
   };
 }
 

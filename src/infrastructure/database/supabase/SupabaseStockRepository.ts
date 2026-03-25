@@ -77,10 +77,10 @@ export class SupabaseStockRepository implements IStockRepository {
       .from("stocks")
       .select("*")
       .eq("product_id", productId)
-      .single();
+      .maybeSingle();
 
-    if (error) throw new AppError("Stock entry not found", 404);
-    return data;
+    if (error) throw new AppError(error.message, 500);
+    return data ?? null;
   }
 
   /**

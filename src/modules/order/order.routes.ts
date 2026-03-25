@@ -109,6 +109,37 @@ router.patch(
   orderController.updateOrderStatus,
 );
 
+/**
+ * @openapi
+ * /api/orders/admin/{id}/payment-status:
+ *   patch:
+ *     tags: [Orders]
+ *     summary: Mark COD order as paid (Admin)
+ *     description: Manually mark a COD order's payment status as paid. Only applicable to COD orders.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Order ID
+ *     responses:
+ *       200:
+ *         description: Payment status updated to paid
+ *       400:
+ *         description: Not a COD order or already paid
+ *       404:
+ *         description: Order not found
+ */
+router.patch(
+  "/admin/:id/payment-status",
+  requireAuth,
+  orderController.markCodOrderPaid,
+);
+
 // ── PayMongo Webhook ──────────────────────────────────────────────────────────
 // No auth — PayMongo calls this directly from their servers
 
@@ -136,25 +167,30 @@ router.post("/webhook/paymongo", orderController.paymongoWebhook);
 
 /**
  * @openapi
- * /api/orders/verify-gcash/{intentId}:
+ * /api/orders/verify-gcash:
  *   get:
  *     tags: [Orders]
- *     summary: Verify GCash payment
- *     description: Verify payment status for a GCash transaction.
+ *     summary: Verify GCash payment and redirect to frontend
+ *     description: >
+ *       Verifies payment status for a GCash transaction and redirects the browser
+ *       to the frontend callback page at `{FRONTEND_URL}/payment/callback` with
+ *       query parameters: `status` (succeeded|pending|failed), `order_id`, and
+ *       `already_confirmed`. This endpoint is used as the PayMongo return URL
+ *       after the user completes or cancels GCash payment.
  *     parameters:
- *       - in: path
- *         name: intentId
+ *       - in: query
+ *         name: payment_intent_id
  *         required: true
  *         schema:
  *           type: string
- *         description: Payment intent ID
+ *         description: Payment intent ID from PayMongo
  *     responses:
- *       200:
- *         description: Payment verification result
- *       400:
- *         description: Invalid intent ID
+ *       302:
+ *         description: >
+ *           Redirects to frontend callback URL, e.g.
+ *           `{FRONTEND_URL}/payment/callback?status=succeeded&order_id=...&already_confirmed=false`
  */
-router.get("/verify-gcash/:intentId", orderController.verifyGCashPayment);
+router.get("/verify-gcash", orderController.verifyGCashPayment);
 
 // ── User / Guest Routes ───────────────────────────────────────────────────────
 // optionalAuth: passes req.user if token present, continues as guest otherwise.
@@ -209,7 +245,7 @@ router.use(optionalAuth);
  *                 example: 123 Main St, Manila
  *               paymentMethod:
  *                 type: string
- *                 enum: [gcash, cod, card]
+ *                 enum: [maya, cod]
  *                 example: cod
  *               discount:
  *                 type: number
