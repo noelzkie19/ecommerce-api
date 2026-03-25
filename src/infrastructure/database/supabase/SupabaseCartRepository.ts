@@ -45,6 +45,9 @@ export class SupabaseCartRepository implements ICartRepository {
             id,
             url,
             position
+          ),
+          stockData:stocks (
+            quantity
           )
         )
       `,
@@ -56,16 +59,33 @@ export class SupabaseCartRepository implements ICartRepository {
     const { data, error } = await query;
     if (error) throw new AppError(error.message, 500);
 
-    return (data ?? []).map((item: any) => ({
-      ...item,
-      product: item.product
-        ? {
-            ...item.product,
-            imageUrl: item.product.image_url,
-            images: item.product.images,
-          }
-        : undefined,
-    }));
+    return (data ?? []).map((item: any) => {
+      const stockEntry = Array.isArray(item.product?.stockData)
+        ? item.product.stockData[0]
+        : item.product?.stockData;
+      const stockQty: number = stockEntry?.quantity ?? 0;
+
+      return {
+        ...item,
+        // Explicitly map snake_case DB columns to camelCase interface fields
+        productId: item.product_id,
+        userId: item.user_id ?? null,
+        guestId: item.guest_id ?? null,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+        product: item.product
+          ? {
+              ...item.product,
+              imageUrl: item.product.image_url,
+              images: item.product.images,
+              stock: {
+                quantity: stockQty,
+                available: stockQty > 0,
+              },
+            }
+          : undefined,
+      };
+    });
   }
 
   /**

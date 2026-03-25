@@ -1,15 +1,18 @@
+/**
+ * Stocks Controller
+ *
+ * Handles HTTP requests for stock endpoints.
+ */
+
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
-import { resolve, TOKENS } from "../../di/container";
-import { IStockRepository } from "../../domain/interfaces/IStockRepository";
-
-/**
- * Get stock repository instance
- */
-function getStockRepository(): IStockRepository {
-  return resolve<IStockRepository>(TOKENS.IStockRepository);
-}
+import {
+  GetAllStockUseCase,
+  UpdateStockUseCase,
+  GetStockByProductIdUseCase,
+  GetStockAvailabilityUseCase,
+} from "../../application/use-cases/stocks";
 
 export const getAllStock = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
@@ -20,21 +23,21 @@ export const getAllStock = catchAsync(
       Math.max(1, Number.parseInt(req.query.limit as string) || 10),
     );
 
-    const stockRepo = getStockRepository();
-    const [{ data, meta }, stats] = await Promise.all([
-      stockRepo.findAll({ search }, page, limit),
-      stockRepo.getStats(),
-    ]);
+    const getAllStockUseCase = new GetAllStockUseCase();
+    const result = await getAllStockUseCase.execute({ search, page, limit });
 
-    sendSuccess(res, { stock: data, stats, meta });
+    sendSuccess(res, result);
   },
 );
 
 export const updateStock = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const productId = String(req.params.productId);
-    const stockRepo = getStockRepository();
-    const updated = await stockRepo.upsert(productId, req.body);
+    const { quantity } = req.body;
+
+    const updateStockUseCase = new UpdateStockUseCase();
+    const updated = await updateStockUseCase.execute({ productId, quantity });
+
     sendSuccess(res, updated, "Stock updated successfully");
   },
 );
@@ -42,24 +45,21 @@ export const updateStock = catchAsync(
 export const getStockByProductId = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const productId = String(req.params.productId);
-    const stockRepo = getStockRepository();
-    const stock = await stockRepo.findByProductId(productId);
+
+    const getStockByProductIdUseCase = new GetStockByProductIdUseCase();
+    const stock = await getStockByProductIdUseCase.execute({ productId });
+
     sendSuccess(res, stock);
   },
 );
 
-/**
- * Public endpoint to get stock availability for a product
- * Returns just whether the product is in stock (no quantity)
- */
 export const getStockAvailability = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const productId = String(req.params.productId);
-    const stockRepo = getStockRepository();
-    const stock = await stockRepo.findByProductId(productId);
 
-    // Return only availability status - not the actual quantity
-    const isAvailable = stock && stock.quantity > 0;
-    sendSuccess(res, { available: isAvailable });
+    const getStockAvailabilityUseCase = new GetStockAvailabilityUseCase();
+    const result = await getStockAvailabilityUseCase.execute({ productId });
+
+    sendSuccess(res, result);
   },
 );

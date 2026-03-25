@@ -96,4 +96,14 @@ export interface IAffiliateSalesRepository {
    * Record sales for a confirmed/delivered order
    */
   recordSalesForOrder(orderId: string): Promise<void>;
+
+  /**
+   * Get aggregated sales totals per affiliate for a given order.
+   * Used to update affiliate totals after recording sales.
+   */
+  getSalesSummaryByOrder(
+    orderId: string,
+  ): Promise<
+    { affiliateId: string; totalSaleAmount: number; totalCommission: number }[]
+  >;
 }

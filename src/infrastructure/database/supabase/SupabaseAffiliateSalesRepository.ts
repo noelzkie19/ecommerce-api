@@ -149,7 +149,13 @@ export class SupabaseAffiliateSalesRepository implements IAffiliateSalesReposito
     if (itemsError) throw new AppError(itemsError.message, 500);
     if (!items?.length) return;
 
-    const productIds = items.map((i: any) => i.product_id);
+    // Filter out items with null product_id to avoid UUID parse errors
+    const validItems = (items as any[]).filter(
+      (i) => i.product_id !== null && i.product_id !== undefined,
+    );
+    if (!validItems.length) return;
+
+    const productIds = validItems.map((i: any) => i.product_id);
 
     const { data: apRows, error: apError } = await db
       .from("affiliate_products")
@@ -162,15 +168,15 @@ export class SupabaseAffiliateSalesRepository implements IAffiliateSalesReposito
     const apMap = new Map<string, any>();
     for (const ap of apRows) apMap.set(ap.product_id, ap);
 
-    const salesRows = items
+    const salesRows = validItems
       .filter((item: any) => apMap.has(item.product_id))
       .map((item: any) => {
         const ap = apMap.get(item.product_id);
-        const lineTotal = item.unit_price * item.quantity;
+        const lineTotal = Number(item.unit_price) * Number(item.quantity);
         const commissionEarned =
           ap.commission_type === "percentage"
-            ? (lineTotal * ap.commission_value) / 100
-            : ap.commission_value * item.quantity;
+            ? (lineTotal * Number(ap.commission_value)) / 100
+            : Number(ap.commission_value) * Number(item.quantity);
 
         return {
           affiliate_id: ap.affiliate_id,
@@ -179,10 +185,14 @@ export class SupabaseAffiliateSalesRepository implements IAffiliateSalesReposito
           product_id: item.product_id,
           quantity: item.quantity,
           sale_amount: lineTotal,
+          // commission_amount is NOT NULL in the DB schema — set it equal to commission_earned
+          commission_amount: commissionEarned,
           commission_type: ap.commission_type,
           commission_value: ap.commission_value,
           commission_earned: commissionEarned,
-          status: "pending",
+          // Auto-approve when order is delivered — no admin approval needed
+          status: "approved",
+          type: "sale",
         };
       });
 
@@ -193,13 +203,51 @@ export class SupabaseAffiliateSalesRepository implements IAffiliateSalesReposito
       .upsert(salesRows, { onConflict: "order_item_id" });
 
     if (upsertError) {
-      if (upsertError.message?.includes("order_item_id")) {
-        throw new AppError(
-          "Database migration required. Run 20260321_add_referral_commission_columns.sql",
-          500,
-        );
-      }
-      throw new AppError(upsertError.message, 500);
+      throw new AppError(
+        `Failed to record affiliate sales: ${upsertError.message}`,
+        500,
+      );
     }
+  }
+
+  /**
+   * Get aggregated sales totals per affiliate for a given order.
+   * Returns an array of { affiliateId, totalSaleAmount, totalCommission }
+   * so the caller can update each affiliate's running totals.
+   */
+  async getSalesSummaryByOrder(
+    orderId: string,
+  ): Promise<
+    { affiliateId: string; totalSaleAmount: number; totalCommission: number }[]
+  > {
+    const { data, error } = await db
+      .from("affiliate_sales")
+      .select("affiliate_id, sale_amount, commission_earned")
+      .eq("order_id", orderId);
+
+    if (error) throw new AppError(error.message, 500);
+    if (!data?.length) return [];
+
+    // Aggregate per affiliate
+    const map = new Map<
+      string,
+      { totalSaleAmount: number; totalCommission: number }
+    >();
+    for (const row of data as any[]) {
+      const existing = map.get(row.affiliate_id) ?? {
+        totalSaleAmount: 0,
+        totalCommission: 0,
+      };
+      map.set(row.affiliate_id, {
+        totalSaleAmount: existing.totalSaleAmount + (row.sale_amount ?? 0),
+        totalCommission:
+          existing.totalCommission + (row.commission_earned ?? 0),
+      });
+    }
+
+    return Array.from(map.entries()).map(([affiliateId, totals]) => ({
+      affiliateId,
+      ...totals,
+    }));
   }
 }

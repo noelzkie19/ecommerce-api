@@ -61,9 +61,17 @@ export interface IOrderRepository {
   updateStatus(id: string, status: OrderStatus): Promise<Order>;
 
   /**
-   * Update payment status
+   * Update payment status by payment intent ID
    */
   updatePaymentStatus(intentId: string, status: PaymentStatus): Promise<void>;
+
+  /**
+   * Update payment status by order ID (for COD orders)
+   */
+  updatePaymentStatusById(
+    orderId: string,
+    status: PaymentStatus,
+  ): Promise<void>;
 
   /**
    * Add order items

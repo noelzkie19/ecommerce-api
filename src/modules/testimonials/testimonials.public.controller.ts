@@ -1,16 +1,17 @@
+/**
+ * Testimonials Public Controller
+ *
+ * Handles HTTP requests for public testimonial endpoints.
+ */
+
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
 import { sendSuccess } from "../../common/utils/response";
 import { AppError } from "../../common/utils/AppError";
-import { resolve, TOKENS } from "../../di/container";
-import { ITestimonialRepository } from "../../domain/interfaces/ITestimonialRepository";
-
-/**
- * Get testimonial repository instance
- */
-function getTestimonialRepository(): ITestimonialRepository {
-  return resolve<ITestimonialRepository>(TOKENS.ITestimonialRepository);
-}
+import {
+  ListTestimonialsUseCase,
+  CreateTestimonialUseCase,
+} from "../../application/use-cases/testimonial";
 
 export const getApprovedTestimonials = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
@@ -19,8 +20,10 @@ export const getApprovedTestimonials = catchAsync(
       100,
       Math.max(1, Number.parseInt(req.query.limit as string) || 10),
     );
-    const testimonialRepo = getTestimonialRepository();
-    const result = await testimonialRepo.findAllApproved(page, limit);
+
+    const listTestimonialsUseCase = new ListTestimonialsUseCase();
+    const result = await listTestimonialsUseCase.execute({ page, limit });
+
     sendSuccess(res, result);
   },
 );
@@ -33,13 +36,14 @@ export const submitTestimonial = catchAsync(
     if (!rating) throw new AppError("rating is required", 400);
     if (!message) throw new AppError("message is required", 400);
 
-    const testimonialRepo = getTestimonialRepository();
-    const created = await testimonialRepo.create({
+    const createTestimonialUseCase = new CreateTestimonialUseCase();
+    const created = await createTestimonialUseCase.execute({
       customerName,
-      location: location ?? null,
+      location,
       rating: Number(rating),
       message,
     });
+
     sendSuccess(res, created, "Testimonial submitted successfully", 201);
   },
 );

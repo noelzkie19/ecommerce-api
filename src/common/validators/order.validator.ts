@@ -6,8 +6,8 @@ export const createOrderSchema = z.object({
   email: z.string().email("Invalid email address"),
   phoneNumber: z.string().min(1, "phoneNumber is required"),
   shippingAddress: z.string().min(1, "shippingAddress is required"),
-  paymentMethod: z.enum(["gcash", "cod", "card"], {
-    errorMap: () => ({ message: "paymentMethod must be gcash, cod, or card" }),
+  paymentMethod: z.enum(["maya", "cod"], {
+    errorMap: () => ({ message: "paymentMethod must be maya or cod" }),
   }),
   discount: z.number().optional(),
   orderNotes: z.string().optional(),

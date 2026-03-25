@@ -151,6 +151,7 @@ export class SupabaseOrderRepository implements IOrderRepository {
     const { data, error } = await supabaseAdmin
       .from("orders")
       .insert({
+        id: props.id,
         user_id: props.userId,
         guest_id: props.guestId,
         full_name: props.fullName,
@@ -200,7 +201,6 @@ export class SupabaseOrderRepository implements IOrderRepository {
 
     let updateData: Record<string, any> = {
       status,
-      updated_at: new Date().toISOString(),
     };
 
     // If COD order is being delivered and payment is still pending, mark as paid
@@ -222,7 +222,7 @@ export class SupabaseOrderRepository implements IOrderRepository {
   }
 
   /**
-   * Update payment status
+   * Update payment status by payment intent ID
    */
   async updatePaymentStatus(
     intentId: string,
@@ -230,8 +230,23 @@ export class SupabaseOrderRepository implements IOrderRepository {
   ): Promise<void> {
     const { error } = await supabaseAdmin
       .from("orders")
-      .update({ payment_status: status, updated_at: new Date().toISOString() })
+      .update({ payment_status: status })
       .eq("payment_intent_id", intentId);
+
+    if (error) throw new AppError(error.message, 500);
+  }
+
+  /**
+   * Update payment status by order ID (for COD orders — admin manual tagging)
+   */
+  async updatePaymentStatusById(
+    orderId: string,
+    status: PaymentStatus,
+  ): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from("orders")
+      .update({ payment_status: status, updated_at: new Date().toISOString() })
+      .eq("id", orderId);
 
     if (error) throw new AppError(error.message, 500);
   }
