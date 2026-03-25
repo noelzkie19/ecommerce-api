@@ -99,7 +99,7 @@ export class PlaceOrderUseCase {
     // 2. Get cart items and validate
     const cartItems = await this.getAndValidateCart(owner);
 
-    // 3. Calculate order totals
+    // 3. Calculate order totals (includes shipping fee in total)
     const { subtotal, orderItems, discount, total } = this.calculateOrderTotals(
       cartItems,
       input,
@@ -186,6 +186,14 @@ export class PlaceOrderUseCase {
   }
 
   /**
+   * Calculate shipping fee based on subtotal.
+   * Free shipping for orders >= ₱999, otherwise ₱150.
+   */
+  private calculateShipping(subtotal: number): number {
+    return subtotal >= 999 ? 0 : 150;
+  }
+
+  /**
    * Calculate order totals from cart items
    */
   private calculateOrderTotals(
@@ -195,6 +203,7 @@ export class PlaceOrderUseCase {
     input: PlaceOrderInput,
   ): {
     subtotal: number;
+    shipping: number;
     orderItems: { productId: string; quantity: number; unitPrice: number }[];
     discount: number;
     total: number;
@@ -220,13 +229,14 @@ export class PlaceOrderUseCase {
     }
 
     const discount = input.discount ?? 0;
-    const total = subtotal - discount;
+    const shipping = this.calculateShipping(subtotal);
+    const total = subtotal + shipping - discount;
 
     if (total <= 0) {
       throw new Error("Order total must be greater than 0");
     }
 
-    return { subtotal, orderItems, discount, total };
+    return { subtotal, shipping, orderItems, discount, total };
   }
 
   /**
