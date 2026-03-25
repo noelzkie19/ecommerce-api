@@ -33,6 +33,10 @@ import coursesRoutes from "./modules/courses/courses.routes";
 
 const app: Application = express();
 
+// ── Trust Proxy (for production behind load balancers/reverse proxies) ─────
+// This enables Express to read X-Forwarded-For header from proxies
+app.set("trust proxy", 1);
+
 // ── Security ─────────────────────────────────────────────────
 app.use(
   helmet({
