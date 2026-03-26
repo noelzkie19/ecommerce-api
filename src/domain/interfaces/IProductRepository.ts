@@ -39,6 +39,7 @@ export interface IProductRepository {
     page: number,
     limit: number,
     filters?: ProductFilters,
+    storeId?: string,
   ): Promise<PaginatedResult<Product>>;
 
   /**

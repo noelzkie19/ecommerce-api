@@ -14,9 +14,10 @@ import {
 
 export const getProducts = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const { category, search } = req.query as {
+    const { category, search, storeId } = req.query as {
       category?: string;
       search?: string;
+      storeId?: string;
     };
     const page = Math.max(1, Number.parseInt(req.query.page as string) || 1);
     const limit = Math.min(
@@ -29,6 +30,7 @@ export const getProducts = catchAsync(
       page,
       limit,
       filters: { category, search },
+      storeId,
     });
 
     res.json({ success: true, data: result.products, meta: result.meta });
