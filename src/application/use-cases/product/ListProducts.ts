@@ -15,6 +15,7 @@ export interface ListProductsInput {
   page?: number;
   limit?: number;
   filters?: ProductFilters;
+  storeId?: string;
 }
 
 /**
@@ -70,6 +71,7 @@ export class ListProductsUseCase {
       page,
       limit,
       input.filters,
+      input.storeId,
     );
 
     return {

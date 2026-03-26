@@ -51,6 +51,45 @@ function normaliseProduct(row: Record<string, unknown>) {
 }
 
 /**
+ * Create an empty paginated result
+ */
+function createEmptyResult(
+  page: number,
+  limit: number,
+): PaginatedResult<Product> {
+  return {
+    data: [],
+    meta: {
+      total: 0,
+      page,
+      limit,
+      totalPages: 0,
+    },
+  };
+}
+
+/**
+ * Apply filters to a Supabase query
+ */
+function applyFilters(query: any, filters?: ProductFilters): any {
+  if (!filters) return query;
+
+  if (filters.category) {
+    query = query.eq("category", filters.category);
+  }
+  if (filters.search) {
+    query = query.ilike("name", `%${filters.search}%`);
+  }
+  if (filters.minPrice !== undefined) {
+    query = query.gte("price", filters.minPrice);
+  }
+  if (filters.maxPrice !== undefined) {
+    query = query.lte("price", filters.maxPrice);
+  }
+  return query;
+}
+
+/**
  * Supabase implementation of IProductRepository
  */
 export class SupabaseProductRepository implements IProductRepository {
@@ -61,28 +100,62 @@ export class SupabaseProductRepository implements IProductRepository {
     page: number,
     limit: number,
     filters?: ProductFilters,
+    storeId?: string,
   ): Promise<PaginatedResult<Product>> {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let query = db
-      .from("products")
-      .select(PRODUCT_WITH_IMAGES_SELECT, { count: "exact" })
-      .range(from, to)
-      .order("created_at", { ascending: false });
+    let query;
 
-    if (filters?.category) {
-      query = query.eq("category", filters.category);
+    // If storeId is provided, filter products by affiliate's storeId
+    if (storeId) {
+      // First find the affiliate by storeId, then get their products
+      const { data: affiliateData, error: affiliateError } = await db
+        .from("affiliates")
+        .select("id")
+        .eq("store_id", storeId)
+        .eq("status", "active")
+        .single();
+
+      if (affiliateError || !affiliateData) {
+        // No affiliate found with this storeId, return empty result
+        return createEmptyResult(page, limit);
+      }
+
+      const affiliateId = affiliateData.id;
+
+      // Get product IDs assigned to this affiliate
+      const { data: affiliateProducts, error: apError } = await db
+        .from("affiliate_products")
+        .select("product_id")
+        .eq("affiliate_id", affiliateId);
+
+      if (apError || !affiliateProducts || affiliateProducts.length === 0) {
+        return createEmptyResult(page, limit);
+      }
+
+      const productIds = (affiliateProducts as { product_id: string }[]).map(
+        (ap) => ap.product_id,
+      );
+
+      // Build query with filters
+      query = db
+        .from("products")
+        .select(PRODUCT_WITH_IMAGES_SELECT, { count: "exact" })
+        .in("id", productIds)
+        .range(from, to)
+        .order("created_at", { ascending: false });
+    } else {
+      // Standard product listing without storeId
+      query = db
+        .from("products")
+        .select(PRODUCT_WITH_IMAGES_SELECT, { count: "exact" })
+        .range(from, to)
+        .order("created_at", { ascending: false });
     }
-    if (filters?.search) {
-      query = query.ilike("name", `%${filters.search}%`);
-    }
-    if (filters?.minPrice !== undefined) {
-      query = query.gte("price", filters.minPrice);
-    }
-    if (filters?.maxPrice !== undefined) {
-      query = query.lte("price", filters.maxPrice);
-    }
+
+    // Apply filters to query (shared by both branches)
+    query = applyFilters(query, filters);
 
     const { data, error, count } = await query;
     if (error) throw new AppError(error.message, 500);
