@@ -54,7 +54,8 @@ export const requireAdmin = catchAsync(
       throw new AppError("Authentication required", 401);
     }
 
-    const userRole = (req.user.app_metadata as { role?: string })?.role;
+    const userRole = (req.user.app_metadata as { role?: string })?.role 
+      ?? (req.user.user_metadata as { role?: string })?.role;
 
     if (userRole !== ROLES.ADMIN) {
       throw new AppError("Admin access required", 403);
