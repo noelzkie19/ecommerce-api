@@ -41,6 +41,7 @@ const upload = multer({ storage: multer.memoryStorage() });
  */
 router.post(
   "/admin/upload-image",
+  requireAuth,
   requireAdmin,
   upload.single("image"),
   productsUploadController.uploadImage,
@@ -77,6 +78,7 @@ router.post(
  */
 router.post(
   "/admin/upload-images",
+  requireAuth,
   requireAdmin,
   upload.array("images", 10),
   productsUploadController.uploadImages,
