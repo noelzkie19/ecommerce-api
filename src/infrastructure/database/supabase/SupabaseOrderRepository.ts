@@ -182,7 +182,11 @@ export class SupabaseOrderRepository implements IOrderRepository {
    * Update order status
    * For COD orders: when status changes to 'delivered', payment_status is automatically set to 'paid'
    */
-  async updateStatus(id: string, status: OrderStatus): Promise<Order> {
+  async updateStatus(
+    id: string,
+    status: OrderStatus,
+    trackingNumber?: string,
+  ): Promise<Order> {
     // First fetch the order to check payment method and current status
     const { data: existingOrder, error: fetchError } = await supabaseAdmin
       .from("orders")
@@ -206,6 +210,11 @@ export class SupabaseOrderRepository implements IOrderRepository {
     // If COD order is being delivered and payment is still pending, mark as paid
     if (isCOD && isDelivering && isPendingPayment) {
       updateData.payment_status = "paid";
+    }
+
+    // Add tracking number if provided
+    if (trackingNumber !== undefined) {
+      updateData.tracking_number = trackingNumber;
     }
 
     const { data, error } = await supabaseAdmin

@@ -20,6 +20,7 @@ import { resolve, TOKENS } from "../../../di/container";
 import { env } from "../../../config/env";
 import { AppError } from "../../../common/utils/AppError";
 import * as paymongoUtils from "../../../utils/paymongo.utils";
+import { SendTemplateEmailUseCase } from "../email/SendTemplateEmail";
 
 /**
  * Input DTO for PlaceOrderUseCase
@@ -75,6 +76,7 @@ export class PlaceOrderUseCase {
   private readonly orderRepository: IOrderRepository;
   private readonly cartRepository: ICartRepository;
   private readonly stockRepository: IStockRepository;
+  private readonly sendTemplateEmailUseCase: SendTemplateEmailUseCase;
 
   constructor(
     orderRepository?: IOrderRepository,
@@ -87,6 +89,7 @@ export class PlaceOrderUseCase {
       cartRepository ?? resolve<ICartRepository>(TOKENS.ICartRepository);
     this.stockRepository =
       stockRepository ?? resolve<IStockRepository>(TOKENS.IStockRepository);
+    this.sendTemplateEmailUseCase = new SendTemplateEmailUseCase();
   }
 
   /**
@@ -146,7 +149,12 @@ export class PlaceOrderUseCase {
     // 10. Deduct stock for each product in the order
     await this.deductStock(orderItems);
 
-    // 10. Return the result
+    // 11. Send order confirmation email (non-blocking)
+    this.sendOrderConfirmationEmail(input, orderId, total, orderItems).catch(
+      (err) => console.error("Failed to send order confirmation email:", err),
+    );
+
+    // 12. Return the result
     return {
       order: this.formatOrderResponse(order),
       mayaRedirectUrl,
@@ -204,7 +212,7 @@ export class PlaceOrderUseCase {
   ): {
     subtotal: number;
     shipping: number;
-    orderItems: { productId: string; quantity: number; unitPrice: number }[];
+    orderItems: { productId: string; quantity: number; unitPrice: number; productName: string; productDescription: string }[],
     discount: number;
     total: number;
   } {
@@ -213,6 +221,8 @@ export class PlaceOrderUseCase {
       productId: string;
       quantity: number;
       unitPrice: number;
+      productName: string;
+      productDescription: string;
     }[] = [];
 
     for (const item of cartItems) {
@@ -225,6 +235,8 @@ export class PlaceOrderUseCase {
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.product.price,
+        productName: item.product.name,
+        productDescription: item.product.description ?? "",
       });
     }
 
@@ -315,7 +327,7 @@ export class PlaceOrderUseCase {
    * Throws an AppError listing all products with insufficient stock.
    */
   private async validateStock(
-    orderItems: { productId: string; quantity: number; unitPrice: number }[],
+    orderItems: { productId: string; quantity: number }[],
   ): Promise<void> {
     const insufficientItems: string[] = [];
 
@@ -342,7 +354,7 @@ export class PlaceOrderUseCase {
    * Stock has already been validated before this point.
    */
   private async deductStock(
-    orderItems: { productId: string; quantity: number; unitPrice: number }[],
+    orderItems: { productId: string; quantity: number }[],
   ): Promise<void> {
     for (const item of orderItems) {
       const currentStock = await this.stockRepository.findByProductId(
@@ -392,5 +404,68 @@ export class PlaceOrderUseCase {
           ? order.updatedAt.toISOString()
           : null,
     };
+  }
+
+  /**
+   * Send order confirmation email
+   */
+  private async sendOrderConfirmationEmail(
+    input: PlaceOrderInput,
+    orderId: string,
+    total: number,
+    orderItems: {
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      productName: string;
+      productDescription: string;
+    }[],
+  ): Promise<void> {
+    try {
+      const itemsList = orderItems
+        .map(
+          (item) =>
+            `<li><strong>${item.productName}</strong>${
+              item.productDescription
+                ? `<br><small>${item.productDescription}</small>`
+                : ""
+            }<br>${item.quantity}x - ₱${item.unitPrice.toLocaleString()}</li>`,
+        )
+        .join("");
+
+      const itemsListText = orderItems
+        .map(
+          (item) =>
+            `- ${item.productName}${
+              item.productDescription ? ` (${item.productDescription})` : ""
+            }: ${item.quantity}x - ₱${item.unitPrice.toLocaleString()}`,
+        )
+        .join("\n");
+
+      await this.sendTemplateEmailUseCase.execute({
+        to: input.email,
+        templateKey: "order_confirmation",
+        variables: {
+          customer_name: input.fullName,
+          order_id: orderId.slice(0, 6),
+          order_date: new Date().toLocaleDateString("en-PH", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }),
+          payment_method:
+            input.paymentMethod === "cod"
+              ? "Cash on Delivery"
+              : "Maya (GCash/Card)",
+          total: total.toLocaleString(),
+          items_list: `<ul style="margin: 0; padding-left: 20px;">${itemsList}</ul>`,
+          items_list_text: itemsListText,
+          shipping_address: input.shippingAddress,
+          year: new Date().getFullYear().toString(),
+        },
+      });
+    } catch (error) {
+      console.error("Error sending order confirmation email:", error);
+    }
   }
 }

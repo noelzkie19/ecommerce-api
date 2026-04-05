@@ -39,6 +39,7 @@ export class SupabaseCartRepository implements ICartRepository {
         product:products (
           id,
           name,
+          description,
           price,
           image_url,
           images:product_images (
