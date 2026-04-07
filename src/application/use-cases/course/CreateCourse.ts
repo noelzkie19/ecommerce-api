@@ -8,6 +8,7 @@ import { ICourseRepository } from "../../../domain/interfaces/ICourseRepository"
 import {
   CreateCourseProps,
   isValidYouTubeUrl,
+  extractVideoId,
 } from "../../../domain/entities/Course";
 import { resolve, TOKENS } from "../../../di/container";
 
@@ -19,10 +20,8 @@ export interface CreateCourseInput {
   description?: string | null;
   youtubeUrl: string;
   thumbnailUrl?: string | null;
-  duration?: number | null;
   category?: string | null;
   isPremium?: boolean;
-  displayOrder?: number;
 }
 
 /**
@@ -35,8 +34,6 @@ export interface CreateCourseOutput {
   youtubeUrl: string;
   youtubeVideoId: string;
   thumbnailUrl: string | null;
-  duration: number | null;
-  formattedDuration: string | null;
   category: string | null;
   isPremium: boolean;
   viewsCount: number;
@@ -69,11 +66,10 @@ export class CreateCourseUseCase {
       title: input.title,
       description: input.description,
       youtubeUrl: input.youtubeUrl,
+      youtubeVideoId: extractVideoId(input.youtubeUrl)!,
       thumbnailUrl: input.thumbnailUrl,
-      duration: input.duration,
       category: input.category,
       isPremium: input.isPremium ?? false,
-      displayOrder: input.displayOrder ?? 0,
     };
 
     const course = await this.courseRepository.create(courseProps);

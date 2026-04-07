@@ -20,10 +20,8 @@ export interface UpdateCourseInput {
   description?: string | null;
   youtubeUrl?: string;
   thumbnailUrl?: string | null;
-  duration?: number | null;
   category?: string | null;
   isPremium?: boolean;
-  displayOrder?: number;
   isActive?: boolean;
 }
 
@@ -37,8 +35,6 @@ export interface UpdateCourseOutput {
   youtubeUrl: string;
   youtubeVideoId: string;
   thumbnailUrl: string | null;
-  duration: number | null;
-  formattedDuration: string | null;
   category: string | null;
   isPremium: boolean;
   viewsCount: number;
@@ -71,10 +67,8 @@ export class UpdateCourseUseCase {
       description: input.description,
       youtubeUrl: input.youtubeUrl,
       thumbnailUrl: input.thumbnailUrl,
-      duration: input.duration,
       category: input.category,
       isPremium: input.isPremium,
-      displayOrder: input.displayOrder,
       isActive: input.isActive,
     };
 

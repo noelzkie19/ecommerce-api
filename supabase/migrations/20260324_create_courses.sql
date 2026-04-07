@@ -8,10 +8,8 @@ CREATE TABLE IF NOT EXISTS courses (
   youtube_url TEXT NOT NULL,
   youtube_video_id TEXT NOT NULL,
   thumbnail_url TEXT,
-  duration INTEGER, -- in seconds
   category TEXT,
   is_premium BOOLEAN DEFAULT false,
-  display_order INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT true,
   views_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -20,7 +18,6 @@ CREATE TABLE IF NOT EXISTS courses (
 
 -- Add indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_courses_category ON courses(category);
-CREATE INDEX IF NOT EXISTS idx_courses_display_order ON courses(display_order);
 CREATE INDEX IF NOT EXISTS idx_courses_is_active ON courses(is_active);
 CREATE INDEX IF NOT EXISTS idx_courses_youtube_video_id ON courses(youtube_video_id);
 

@@ -37,6 +37,7 @@ export class Order {
   readonly affiliateId: string | null;
   readonly trackingMethod: string | null;
   readonly clickId: string | null;
+  readonly trackingNumber: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   private _items: OrderItem[] = [];
@@ -60,6 +61,7 @@ export class Order {
     this.affiliateId = props.affiliateId;
     this.trackingMethod = props.trackingMethod;
     this.clickId = props.clickId;
+    this.trackingNumber = props.trackingNumber;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -87,6 +89,7 @@ export class Order {
       affiliateId: props.affiliateId ?? null,
       trackingMethod: props.trackingMethod ?? null,
       clickId: props.clickId ?? null,
+      trackingNumber: props.trackingNumber ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -115,6 +118,7 @@ export class Order {
       affiliateId: row.affiliate_id,
       trackingMethod: row.tracking_method,
       clickId: row.click_id,
+      trackingNumber: row.tracking_number,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     });
@@ -269,6 +273,7 @@ export class Order {
       affiliateId: this.affiliateId,
       trackingMethod: this.trackingMethod,
       clickId: this.clickId,
+      trackingNumber: this.trackingNumber,
       items: this._items.map((item) => item.toResponse()),
       createdAt:
         this.createdAt && !Number.isNaN(this.createdAt.getTime())
@@ -301,6 +306,7 @@ export class Order {
       affiliateId: this.affiliateId,
       trackingMethod: this.trackingMethod,
       clickId: this.clickId,
+      trackingNumber: this.trackingNumber,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
@@ -369,6 +375,7 @@ interface OrderProps {
   affiliateId: string | null;
   trackingMethod: string | null;
   clickId: string | null;
+  trackingNumber: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -404,6 +411,7 @@ export interface CreateOrderProps {
   affiliateId?: string | null;
   trackingMethod?: string | null;
   clickId?: string | null;
+  trackingNumber?: string | null;
 }
 
 /**
@@ -428,6 +436,7 @@ export interface OrderDatabaseRow {
   affiliate_id: string | null;
   tracking_method: string | null;
   click_id: string | null;
+  tracking_number: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -465,6 +474,7 @@ export interface OrderResponse {
   affiliateId: string | null;
   trackingMethod: string | null;
   clickId: string | null;
+  trackingNumber: string | null;
   items: OrderItemResponse[];
   createdAt: string | null;
   updatedAt: string | null;

@@ -13,14 +13,35 @@ export const createOrderSchema = z.object({
   orderNotes: z.string().optional(),
 });
 
-export const updateOrderStatusSchema = z.object({
-  status: z.enum(
-    ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"],
-    {
-      errorMap: () => ({ message: "Invalid order status" }),
+export const updateOrderStatusSchema = z
+  .object({
+    status: z.enum(
+      [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+      ],
+      {
+        errorMap: () => ({ message: "Invalid order status" }),
+      },
+    ),
+    trackingNumber: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.status === "shipped") {
+        return data.trackingNumber && data.trackingNumber.length > 0;
+      }
+      return true;
     },
-  ),
-});
+    {
+      message: "trackingNumber is required when status is 'shipped'",
+      path: ["trackingNumber"],
+    },
+  );
 
 export const intentIdParamSchema = z.object({
   intentId: z.string().min(1, "intentId is required"),

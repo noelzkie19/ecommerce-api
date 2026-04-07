@@ -13,9 +13,10 @@ import {
 } from "../../../domain/interfaces/ICourseRepository";
 import {
   Course,
-  CourseFilters,
   CreateCourseProps,
   UpdateCourseProps,
+  CourseFilters,
+  extractVideoId,
 } from "../../../domain/entities/Course";
 
 const db = supabaseAdmin as any;
@@ -57,8 +58,7 @@ export class SupabaseCourseRepository implements ICourseRepository {
       query = query.eq("is_premium", filters.isPremium);
     }
 
-    // Order by display_order first, then by created_at
-    query = query.order("display_order", { ascending: true });
+    // Order by created_at descending
     query = query.order("created_at", { ascending: false });
 
     const { data, error, count } = await query;
@@ -100,7 +100,7 @@ export class SupabaseCourseRepository implements ICourseRepository {
       .select("*")
       .eq("category", category)
       .eq("is_active", true)
-      .order("display_order", { ascending: true });
+      .order("created_at", { ascending: false });
 
     if (error) throw new AppError(error.message, 500);
 
@@ -116,7 +116,7 @@ export class SupabaseCourseRepository implements ICourseRepository {
       .select("*")
       .ilike("title", `%${search}%`)
       .eq("is_active", true)
-      .order("display_order", { ascending: true });
+      .order("created_at", { ascending: false });
 
     if (error) throw new AppError(error.message, 500);
 
@@ -149,17 +149,16 @@ export class SupabaseCourseRepository implements ICourseRepository {
    * Create a new course
    */
   async create(props: CreateCourseProps): Promise<Course> {
+    const youtubeVideoId = props.youtubeVideoId ?? extractVideoId(props.youtubeUrl);
     const payload = {
       id: props.id,
       title: props.title,
       description: props.description ?? null,
       youtube_url: props.youtubeUrl,
-      youtube_video_id: props.youtubeVideoId,
+      youtube_video_id: youtubeVideoId,
       thumbnail_url: props.thumbnailUrl ?? null,
-      duration: props.duration ?? null,
       category: props.category ?? null,
       is_premium: props.isPremium ?? false,
-      display_order: props.displayOrder ?? 0,
       is_active: props.isActive ?? true,
       views_count: props.viewsCount ?? 0,
     };
@@ -184,10 +183,8 @@ export class SupabaseCourseRepository implements ICourseRepository {
         description: data.description,
         youtube_url: data.youtubeUrl,
         thumbnail_url: data.thumbnailUrl,
-        duration: data.duration,
         category: data.category,
         is_premium: data.isPremium,
-        display_order: data.displayOrder,
         is_active: data.isActive,
       }).filter(([, v]) => v !== undefined),
     );

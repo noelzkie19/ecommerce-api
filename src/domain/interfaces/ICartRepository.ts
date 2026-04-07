@@ -36,6 +36,7 @@ export interface CartItem {
   product?: {
     id: string;
     name: string;
+    description?: string | null;
     price: number;
     imageUrl: string | null;
     images?: Array<{

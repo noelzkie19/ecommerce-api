@@ -72,10 +72,8 @@ export class Course {
   readonly youtubeUrl: string;
   readonly youtubeVideoId: string;
   readonly thumbnailUrl: string | null;
-  readonly duration: number | null;
   readonly category: string | null;
   readonly isPremium: boolean;
-  readonly displayOrder: number;
   readonly isActive: boolean;
   readonly viewsCount: number;
   readonly createdAt: Date;
@@ -88,10 +86,8 @@ export class Course {
     this.youtubeUrl = props.youtubeUrl;
     this.youtubeVideoId = props.youtubeVideoId;
     this.thumbnailUrl = props.thumbnailUrl;
-    this.duration = props.duration;
     this.category = props.category;
     this.isPremium = props.isPremium;
-    this.displayOrder = props.displayOrder;
     this.isActive = props.isActive;
     this.viewsCount = props.viewsCount;
     this.createdAt = props.createdAt;
@@ -119,10 +115,8 @@ export class Course {
       youtubeUrl: props.youtubeUrl,
       youtubeVideoId: videoId,
       thumbnailUrl,
-      duration: props.duration ?? null,
       category: props.category ?? null,
       isPremium: props.isPremium ?? false,
-      displayOrder: props.displayOrder ?? 0,
       isActive: props.isActive ?? true,
       viewsCount: props.viewsCount ?? 0,
       createdAt: props.createdAt ?? new Date(),
@@ -141,10 +135,8 @@ export class Course {
       youtubeUrl: row.youtube_url,
       youtubeVideoId: row.youtube_video_id,
       thumbnailUrl: row.thumbnail_url,
-      duration: row.duration,
       category: row.category,
       isPremium: row.is_premium ?? false,
-      displayOrder: row.display_order ?? 0,
       isActive: row.is_active ?? true,
       viewsCount: row.views_count ?? 0,
       createdAt: new Date(row.created_at),
@@ -157,29 +149,6 @@ export class Course {
    */
   hasThumbnail(): boolean {
     return this.thumbnailUrl !== null;
-  }
-
-  /**
-   * Check if course has duration
-   */
-  hasDuration(): boolean {
-    return this.duration !== null && this.duration > 0;
-  }
-
-  /**
-   * Format duration as HH:MM:SS or MM:SS
-   */
-  getFormattedDuration(): string | null {
-    if (!this.duration) return null;
-
-    const hours = Math.floor(this.duration / 3600);
-    const minutes = Math.floor((this.duration % 3600) / 60);
-    const seconds = this.duration % 60;
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-    }
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }
 
   /**
@@ -223,17 +192,6 @@ export class Course {
   }
 
   /**
-   * Update display order
-   */
-  updateDisplayOrder(order: number): Course {
-    return new Course({
-      ...this.toProps(),
-      displayOrder: order,
-      updatedAt: new Date(),
-    });
-  }
-
-  /**
    * Convert to plain object for response
    */
   toResponse(): CourseResponse {
@@ -244,11 +202,8 @@ export class Course {
       youtubeUrl: this.youtubeUrl,
       youtubeVideoId: this.youtubeVideoId,
       thumbnailUrl: this.thumbnailUrl,
-      duration: this.duration,
-      formattedDuration: this.getFormattedDuration(),
       category: this.category,
       isPremium: this.isPremium,
-      displayOrder: this.displayOrder,
       isActive: this.isActive,
       viewsCount: this.viewsCount,
       embedUrl: this.getEmbedUrl(),
@@ -271,10 +226,8 @@ export class Course {
       youtubeUrl: this.youtubeUrl,
       youtubeVideoId: this.youtubeVideoId,
       thumbnailUrl: this.thumbnailUrl,
-      duration: this.duration,
       category: this.category,
       isPremium: this.isPremium,
-      displayOrder: this.displayOrder,
       isActive: this.isActive,
       viewsCount: this.viewsCount,
       createdAt: this.createdAt,
@@ -293,10 +246,8 @@ interface CourseProps {
   youtubeUrl: string;
   youtubeVideoId: string;
   thumbnailUrl: string | null;
-  duration: number | null;
   category: string | null;
   isPremium: boolean;
-  displayOrder: number;
   isActive: boolean;
   viewsCount: number;
   createdAt: Date;
@@ -313,10 +264,8 @@ export interface CreateCourseProps {
   youtubeUrl: string;
   youtubeVideoId?: string;
   thumbnailUrl?: string | null;
-  duration?: number | null;
   category?: string | null;
   isPremium?: boolean;
-  displayOrder?: number;
   isActive?: boolean;
   viewsCount?: number;
   createdAt?: Date;
@@ -331,10 +280,8 @@ export interface UpdateCourseProps {
   description?: string | null;
   youtubeUrl?: string;
   thumbnailUrl?: string | null;
-  duration?: number | null;
   category?: string | null;
   isPremium?: boolean;
-  displayOrder?: number;
   isActive?: boolean;
 }
 
@@ -358,10 +305,8 @@ export interface CourseDatabaseRow {
   youtube_url: string;
   youtube_video_id: string;
   thumbnail_url: string | null;
-  duration: number | null;
   category: string | null;
   is_premium: boolean | null;
-  display_order: number | null;
   is_active: boolean | null;
   views_count: number | null;
   created_at: string;
@@ -378,11 +323,8 @@ export interface CourseResponse {
   youtubeUrl: string;
   youtubeVideoId: string;
   thumbnailUrl: string | null;
-  duration: number | null;
-  formattedDuration: string | null;
   category: string | null;
   isPremium: boolean;
-  displayOrder: number;
   isActive: boolean;
   viewsCount: number;
   embedUrl: string;
