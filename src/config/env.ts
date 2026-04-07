@@ -19,6 +19,9 @@ const envSchema = z.object({
   META_PIXEL_ID: z.string().optional(),
   META_ACCESS_TOKEN: z.string().optional(),
   PAYMONGO_SECRET_KEY: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default("Triad365 <noreply@triad365.com>"),
+  EMAIL_REPLY_TO: z.string().default("support@triad365.com"),
 });
 
 const parsed = envSchema.safeParse(process.env);

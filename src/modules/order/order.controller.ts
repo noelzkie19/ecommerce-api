@@ -140,12 +140,13 @@ export const getAllOrders = catchAsync(
 export const updateOrderStatus = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateOrderIdParam(req.params);
-    const { status } = validateUpdateOrderStatus(req.body);
+    const { status, trackingNumber } = validateUpdateOrderStatus(req.body);
 
     const updateOrderStatusUseCase = new UpdateOrderStatusUseCase();
     const order = await updateOrderStatusUseCase.execute({
       orderId: id,
       status,
+      trackingNumber,
     });
 
     sendSuccess(res, order, "Order status updated successfully");

@@ -7,6 +7,7 @@
 import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
 import { CreateAffiliateProps } from "../../../domain/entities/Affiliate";
 import { resolve, TOKENS } from "../../../di/container";
+import { SendTemplateEmailUseCase } from "../email/SendTemplateEmail";
 
 /**
  * Input DTO for CreateAffiliateUseCase
@@ -44,11 +45,13 @@ export interface CreateAffiliateOutput {
  */
 export class CreateAffiliateUseCase {
   private readonly affiliateRepository: IAffiliateRepository;
+  private readonly sendTemplateEmailUseCase: SendTemplateEmailUseCase;
 
   constructor(affiliateRepository?: IAffiliateRepository) {
     this.affiliateRepository =
       affiliateRepository ??
       resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+    this.sendTemplateEmailUseCase = new SendTemplateEmailUseCase();
   }
 
   /**
@@ -64,6 +67,30 @@ export class CreateAffiliateUseCase {
     };
 
     const affiliate = await this.affiliateRepository.create(affiliateProps);
+
+    // Send welcome email (non-blocking)
+    this.sendWelcomeEmail(input.email, input.name).catch((err) =>
+      console.error("Failed to send affiliate welcome email:", err),
+    );
+
     return affiliate.toResponse();
+  }
+
+  /**
+   * Send welcome email to new affiliate
+   */
+  private async sendWelcomeEmail(email: string, name: string): Promise<void> {
+    try {
+      await this.sendTemplateEmailUseCase.execute({
+        to: email,
+        templateKey: "affiliate_welcome",
+        variables: {
+          affiliate_name: name,
+          year: new Date().getFullYear().toString(),
+        },
+      });
+    } catch (error) {
+      console.error("Error sending affiliate welcome email:", error);
+    }
   }
 }

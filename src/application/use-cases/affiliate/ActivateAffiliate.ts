@@ -6,6 +6,7 @@
 
 import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
 import { resolve, TOKENS } from "../../../di/container";
+import { SendTemplateEmailUseCase } from "../email/SendTemplateEmail";
 
 /**
  * Input DTO for ActivateAffiliateUseCase
@@ -40,11 +41,13 @@ export interface ActivateAffiliateOutput {
  */
 export class ActivateAffiliateUseCase {
   private readonly affiliateRepository: IAffiliateRepository;
+  private readonly sendTemplateEmailUseCase: SendTemplateEmailUseCase;
 
   constructor(affiliateRepository?: IAffiliateRepository) {
     this.affiliateRepository =
       affiliateRepository ??
       resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+    this.sendTemplateEmailUseCase = new SendTemplateEmailUseCase();
   }
 
   /**
@@ -74,6 +77,39 @@ export class ActivateAffiliateUseCase {
       status: "active",
     });
 
+    // Send activation email (non-blocking)
+    this.sendActivationEmail(
+      activated.email,
+      activated.name,
+      activated.affiliateLink,
+    ).catch((err) =>
+      console.error("Failed to send affiliate activation email:", err),
+    );
+
     return activated.toResponse();
+  }
+
+  /**
+   * Send activation email to affiliate
+   */
+  private async sendActivationEmail(
+    email: string,
+    name: string,
+    affiliateLink: string | null,
+  ): Promise<void> {
+    try {
+      await this.sendTemplateEmailUseCase.execute({
+        to: email,
+        templateKey: "affiliate_activated",
+        variables: {
+          affiliate_name: name,
+          affiliate_link: affiliateLink || "N/A",
+          dashboard_url: `${process.env.FRONTEND_URL}/affiliate/dashboard`,
+          year: new Date().getFullYear().toString(),
+        },
+      });
+    } catch (error) {
+      console.error("Error sending affiliate activation email:", error);
+    }
   }
 }

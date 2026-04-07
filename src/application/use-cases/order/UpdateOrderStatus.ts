@@ -22,6 +22,7 @@ import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepos
 import { AppError } from "../../../common/utils/AppError";
 import { resolve, TOKENS } from "../../../di/container";
 import type { OrderStatus } from "../../../domain/entities/Order";
+import { SendTemplateEmailUseCase } from "../email/SendTemplateEmail";
 
 /**
  * Valid status transitions map
@@ -41,6 +42,8 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 export interface UpdateOrderStatusInput {
   orderId: string;
   status: OrderStatus;
+  trackingNumber?: string;
+  cancellationReason?: string;
 }
 
 /**
@@ -77,6 +80,7 @@ export class UpdateOrderStatusUseCase {
   private readonly orderRepository: IOrderRepository;
   private readonly affiliateSalesRepository: IAffiliateSalesRepository;
   private readonly affiliateRepository: IAffiliateRepository;
+  private readonly sendTemplateEmailUseCase: SendTemplateEmailUseCase;
 
   constructor(
     orderRepository?: IOrderRepository,
@@ -91,6 +95,7 @@ export class UpdateOrderStatusUseCase {
     this.affiliateRepository =
       affiliateRepository ??
       resolve<IAffiliateRepository>(TOKENS.IAffiliateRepository);
+    this.sendTemplateEmailUseCase = new SendTemplateEmailUseCase();
   }
 
   /**
@@ -119,7 +124,24 @@ export class UpdateOrderStatusUseCase {
     }
 
     // Update order status
-    await this.orderRepository.updateStatus(input.orderId, input.status);
+    await this.orderRepository.updateStatus(
+      input.orderId,
+      input.status,
+      input.trackingNumber,
+    );
+
+    // Send status update email (non-blocking)
+    this.sendStatusUpdateEmail(
+      currentOrder.email,
+      currentOrder.fullName,
+      input.orderId,
+      input.status,
+      input.trackingNumber,
+      input.cancellationReason,
+      currentOrder.shippingAddress,
+    ).catch((err) =>
+      console.error("Failed to send order status update email:", err),
+    );
 
     // When a COD order is marked as "delivered", it is considered paid.
     // Record affiliate sales and update affiliate totals.
@@ -170,6 +192,60 @@ export class UpdateOrderStatusUseCase {
           err,
         );
       }
+    }
+  }
+
+  /**
+   * Send status update email based on the new status
+   */
+  private async sendStatusUpdateEmail(
+    email: string,
+    customerName: string,
+    orderId: string,
+    status: OrderStatus,
+    trackingNumber?: string,
+    cancellationReason?: string,
+    shippingAddress?: string,
+  ): Promise<void> {
+    try {
+      let templateKey: string;
+      const variables: Record<string, string> = {
+        customer_name: customerName,
+        order_id: orderId.slice(0, 6),
+        year: new Date().getFullYear().toString(),
+      };
+
+      switch (status) {
+        case "processing":
+          templateKey = "order_processing";
+          break;
+
+        case "shipped":
+          templateKey = "order_shipped";
+          variables.tracking_number = trackingNumber ?? "";
+          variables.shipping_address = shippingAddress ?? "";
+          break;
+
+        case "delivered":
+          templateKey = "order_delivered";
+          break;
+
+        case "cancelled":
+          templateKey = "order_cancelled";
+          variables.cancellation_reason = cancellationReason ?? "";
+          break;
+
+        default:
+          return;
+      }
+
+      await this.sendTemplateEmailUseCase.execute({
+        to: email,
+        templateKey,
+        variables,
+      });
+    } catch (error) {
+      console.error("Error sending status update email:", error);
     }
   }
 }

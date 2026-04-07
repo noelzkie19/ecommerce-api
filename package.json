@@ -11,7 +11,9 @@
     "test": "jest --runInBand",
     "db:types": "supabase gen types typescript --local > src/common/types/supabase.types.ts",
     "db:migrate": "supabase db push",
-    "db:migration:create": "supabase migration new"
+    "db:migration:create": "supabase migration new",
+    "email:seed": "npx tsx scripts/update-email-templates.ts",
+    "email:seed:dry": "npx tsx scripts/update-email-templates.ts --dry-run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -26,6 +28,7 @@
     "hpp": "^0.2.3",
     "morgan": "^1.10.0",
     "multer": "^2.1.0",
+    "resend": "^6.10.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "winston": "^3.17.0",
