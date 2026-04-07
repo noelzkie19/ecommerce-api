@@ -24,8 +24,6 @@ export interface GetCourseOutput {
   youtubeUrl: string;
   youtubeVideoId: string;
   thumbnailUrl: string | null;
-  duration: number | null;
-  formattedDuration: string | null;
   category: string | null;
   isPremium: boolean;
   viewsCount: number;
