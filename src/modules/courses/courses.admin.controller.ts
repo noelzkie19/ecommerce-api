@@ -6,7 +6,6 @@
 
 import { Request, Response } from "express";
 import { catchAsync } from "../../common/utils/catchAsync";
-import { sendSuccess } from "../../common/utils/response";
 import {
   ListCoursesUseCase,
   CreateCourseUseCase,
@@ -67,7 +66,7 @@ export const updateCourse = catchAsync(
     const id = String(req.params.id);
     const useCase = new UpdateCourseUseCase();
     const course = await useCase.execute({ courseId: id, ...req.body });
-    sendSuccess(res, course);
+    res.json({ success: true, data: course });
   },
 );
 
