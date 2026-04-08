@@ -115,6 +115,29 @@ router.put("/admin/:id", requireAuth, coursesAdminController.updateCourse);
 /**
  * @openapi
  * /api/courses/admin/{id}:
+ *   patch:
+ *     tags: [Admin - Courses]
+ *     summary: Partial update a course
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Course updated
+ *       401:
+ *         description: Unauthorized
+ */
+router.patch("/admin/:id", requireAuth, coursesAdminController.updateCourse);
+
+/**
+ * @openapi
+ * /api/courses/admin/{id}:
  *   delete:
  *     tags: [Admin - Courses]
  *     summary: Delete a course
