@@ -38,6 +38,12 @@ export class LoginUserUseCase {
    * Execute the use case
    */
   async execute(input: LoginUserInput): Promise<LoginUserOutput> {
+    if (!input.email || input.email.trim() === "") {
+      throw new Error("Email is required");
+    }
+    if (!input.password || input.password.trim() === "") {
+      throw new Error("Password is required");
+    }
     return this.authRepository.login({
       email: input.email,
       password: input.password,
