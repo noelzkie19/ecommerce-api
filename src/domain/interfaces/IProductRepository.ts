@@ -12,6 +12,9 @@ import {
   CreateProductProps,
   UpdateProductProps,
   ProductImage,
+  ProductBundle,
+  CreateProductBundleProps,
+  UpdateProductBundleProps,
 } from "../entities/Product";
 
 /**
@@ -110,4 +113,35 @@ export interface IProductRepository {
    * Get the maximum image position for a product
    */
   getMaxImagePosition(productId: string): Promise<number>;
+
+  /**
+   * Find all bundles for a product
+   */
+  findBundlesByProductId(productId: string): Promise<ProductBundle[]>;
+
+  /**
+   * Find a single bundle by ID
+   */
+  findBundleById(bundleId: string): Promise<ProductBundle | null>;
+
+  /**
+   * Create bundles for a product
+   */
+  createBundles(
+    productId: string,
+    bundles: CreateProductBundleProps[],
+  ): Promise<ProductBundle[]>;
+
+  /**
+   * Update bundles for a product (replaces all existing)
+   */
+  updateBundles(
+    productId: string,
+    bundles: UpdateProductBundleProps[],
+  ): Promise<ProductBundle[]>;
+
+  /**
+   * Delete a bundle
+   */
+  deleteBundle(bundleId: string): Promise<void>;
 }

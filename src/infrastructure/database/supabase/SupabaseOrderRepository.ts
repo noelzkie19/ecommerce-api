@@ -270,6 +270,7 @@ export class SupabaseOrderRepository implements IOrderRepository {
     const orderItems = items.map((item) => ({
       order_id: orderId,
       product_id: item.productId,
+      product_bundle_id: item.productBundleId ?? null,
       quantity: item.quantity,
       unit_price: item.unitPrice,
     }));
@@ -318,11 +319,28 @@ export class SupabaseOrderRepository implements IOrderRepository {
 
   /**
    * Deduct stock for order items
+   * This handles both regular items and bundles
    */
   async deductStock(items: StockDeductionItem[]): Promise<void> {
     for (const item of items) {
+      // Calculate quantity to deduct - if bundle, multiply by bundleQty
+      let quantityToDeduct = item.quantity;
+
+      if (item.productBundleId) {
+        // Fetch bundle to get bundleQty
+        const { data: bundle, error: bundleError } = await supabaseAdmin
+          .from("product_bundles")
+          .select("bundle_qty")
+          .eq("id", item.productBundleId)
+          .single();
+
+        if (!bundleError && bundle) {
+          quantityToDeduct = (bundle.bundle_qty ?? 1) * item.quantity;
+        }
+      }
+
       const { data: stock, error: fetchError } = await supabaseAdmin
-        .from("stock")
+        .from("stocks")
         .select("id, quantity")
         .eq("product_id", item.productId)
         .single();
@@ -334,7 +352,7 @@ export class SupabaseOrderRepository implements IOrderRepository {
         );
       }
 
-      if (stock.quantity < item.quantity) {
+      if (stock.quantity < quantityToDeduct) {
         throw new AppError(
           `Insufficient stock for product ${item.productId}`,
           400,
@@ -342,8 +360,8 @@ export class SupabaseOrderRepository implements IOrderRepository {
       }
 
       const { error: updateError } = await supabaseAdmin
-        .from("stock")
-        .update({ quantity: stock.quantity - item.quantity })
+        .from("stocks")
+        .update({ quantity: stock.quantity - quantityToDeduct })
         .eq("id", stock.id);
 
       if (updateError) throw new AppError(updateError.message, 500);

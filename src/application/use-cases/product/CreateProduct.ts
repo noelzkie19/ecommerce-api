@@ -24,6 +24,12 @@ export interface CreateProductInput {
   reviewCount?: number | null;
   originalPrice?: number | null;
   affiliateLink?: string | null;
+  bundles?: Array<{
+    name: string;
+    bundleQty: number;
+    bundlePrice: number;
+    isActive: boolean;
+  }>;
 }
 
 /**
@@ -80,6 +86,28 @@ export class CreateProductUseCase {
     };
 
     const product = await this.productRepository.create(productProps);
-    return product.toResponse();
+
+    // Create bundles if provided
+    if (input.bundles && input.bundles.length > 0) {
+      const bundleProps = input.bundles.map((b) => ({
+        id: crypto.randomUUID(),
+        productId: product.id,
+        name: b.name,
+        bundleQty: b.bundleQty,
+        bundlePrice: b.bundlePrice,
+        isActive: b.isActive ?? true,
+      }));
+      await this.productRepository.createBundles(product.id, bundleProps);
+    }
+
+    // Reload product to get bundles
+    const productWithBundles = await this.productRepository.findById(
+      product.id,
+    );
+    if (!productWithBundles) {
+      throw new Error("Product not found after creation");
+    }
+
+    return productWithBundles.toResponse();
   }
 }

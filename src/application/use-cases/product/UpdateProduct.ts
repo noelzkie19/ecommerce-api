@@ -25,6 +25,12 @@ export interface UpdateProductInput {
   reviewCount?: number | null;
   originalPrice?: number | null;
   affiliateLink?: string | null;
+  bundles?: Array<{
+    name: string;
+    bundleQty: number;
+    bundlePrice: number;
+    isActive: boolean;
+  }>;
 }
 
 /**
@@ -94,10 +100,24 @@ export class UpdateProductUseCase {
       }
     });
 
-    const product = await this.productRepository.update(
+    await this.productRepository.update(input.productId, updateData);
+
+    // Update bundles if provided (passing empty array clears all bundles)
+    if (input.bundles !== undefined) {
+      await this.productRepository.updateBundles(
+        input.productId,
+        input.bundles,
+      );
+    }
+
+    // Reload product to get updated bundles
+    const productWithBundles = await this.productRepository.findById(
       input.productId,
-      updateData,
     );
-    return product.toResponse();
+    if (!productWithBundles) {
+      throw new Error("Product not found after update");
+    }
+
+    return productWithBundles.toResponse();
   }
 }

@@ -41,6 +41,18 @@ export interface GetProductOutput {
     position: number;
     createdAt: string | null;
   }>;
+  bundles: Array<{
+    id: string;
+    productId: string;
+    name: string;
+    bundleQty: number;
+    bundlePrice: number;
+    bundlePriceFormatted: string;
+    unitPrice: number;
+    isActive: boolean;
+    createdAt: string | null;
+    updatedAt: string | null;
+  }>;
   createdAt: string | null;
   updatedAt: string | null;
 }

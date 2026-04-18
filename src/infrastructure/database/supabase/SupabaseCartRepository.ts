@@ -50,6 +50,12 @@ export class SupabaseCartRepository implements ICartRepository {
           stockData:stocks (
             quantity
           )
+        ),
+        bundle:product_bundles (
+          id,
+          name,
+          bundle_qty,
+          bundle_price
         )
       `,
       )
@@ -70,10 +76,19 @@ export class SupabaseCartRepository implements ICartRepository {
         ...item,
         // Explicitly map snake_case DB columns to camelCase interface fields
         productId: item.product_id,
+        productBundleId: item.product_bundle_id ?? null,
         userId: item.user_id ?? null,
         guestId: item.guest_id ?? null,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
+        productBundle: item.bundle
+          ? {
+              id: item.bundle.id,
+              name: item.bundle.name,
+              bundleQty: item.bundle.bundle_qty,
+              bundlePrice: item.bundle.bundle_price,
+            }
+          : null,
         product: item.product
           ? {
               ...item.product,
@@ -115,7 +130,12 @@ export class SupabaseCartRepository implements ICartRepository {
   async upsert(owner: CartOwner, dto: AddToCartDTO): Promise<CartItem> {
     const existing = await this.findItem(owner, dto.productId);
 
-    if (existing) {
+    // Check if existing item has same bundle or no bundle
+    const hasSameBundle =
+      existing?.productBundleId === dto.productBundleId ||
+      (!existing?.productBundleId && !dto.productBundleId);
+
+    if (existing && hasSameBundle) {
       const { data, error } = await supabaseAdmin
         .from("cart_items")
         .update({ quantity: existing.quantity + dto.quantity })
@@ -126,12 +146,14 @@ export class SupabaseCartRepository implements ICartRepository {
       return data;
     }
 
+    // Insert new cart item with bundle reference
     const { data, error } = await supabaseAdmin
       .from("cart_items")
       .insert({
         user_id: owner.userId ?? null,
         guest_id: owner.guestId ?? null,
         product_id: dto.productId,
+        product_bundle_id: dto.productBundleId ?? null,
         quantity: dto.quantity,
       } as any)
       .select()
@@ -193,7 +215,11 @@ export class SupabaseCartRepository implements ICartRepository {
     for (const item of guestItems) {
       await this.upsert(
         { userId },
-        { productId: item.productId, quantity: item.quantity },
+        {
+          productId: item.productId,
+          productBundleId: item.productBundleId ?? undefined,
+          quantity: item.quantity,
+        },
       );
     }
 
