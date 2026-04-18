@@ -41,14 +41,19 @@ export {
 export {
   Product,
   ProductImage,
+  ProductBundle,
   type ProductStatus,
   type CreateProductProps,
   type UpdateProductProps,
   type ProductFilters,
   type ProductDatabaseRow,
   type ProductImageDatabaseRow,
+  type ProductBundleDatabaseRow,
   type ProductResponse,
   type ProductImageResponse,
+  type ProductBundleResponse,
+  type CreateProductBundleProps,
+  type UpdateProductBundleProps,
 } from "./Product";
 
 // Course exports

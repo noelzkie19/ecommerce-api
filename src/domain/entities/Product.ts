@@ -77,6 +77,7 @@ export class Product {
   readonly originalPrice: Money | null;
   readonly affiliateLink: string | null;
   readonly images: ProductImage[];
+  readonly bundles!: ProductBundle[];
   readonly createdAt: Date;
   readonly updatedAt: Date;
 
@@ -93,6 +94,7 @@ export class Product {
     this.originalPrice = props.originalPrice;
     this.affiliateLink = props.affiliateLink;
     this.images = props.images;
+    this.bundles = props.bundles;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -116,6 +118,7 @@ export class Product {
         : null,
       affiliateLink: props.affiliateLink ?? null,
       images: props.images ?? [],
+      bundles: props.bundles ?? [],
       createdAt: props.createdAt ?? new Date(),
       updatedAt: props.updatedAt ?? new Date(),
     });
@@ -128,6 +131,12 @@ export class Product {
     const images = Array.isArray(row.images)
       ? row.images.map((img: ProductImageDatabaseRow) =>
           ProductImage.fromDatabase(img),
+        )
+      : [];
+
+    const bundles = Array.isArray(row.bundles)
+      ? row.bundles.map((b: ProductBundleDatabaseRow) =>
+          ProductBundle.fromDatabase(b),
         )
       : [];
 
@@ -146,6 +155,7 @@ export class Product {
         : null,
       affiliateLink: row.affiliate_link,
       images,
+      bundles,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     });
@@ -276,6 +286,7 @@ export class Product {
       hasDiscount: this.hasDiscount(),
       discountPercentage: Math.round(this.getDiscountPercentage()),
       images: this.images.map((img) => img.toResponse()),
+      bundles: this.bundles.map((bundle) => bundle.toResponse()),
       createdAt:
         this.createdAt && !Number.isNaN(this.createdAt.getTime())
           ? this.createdAt.toISOString()
@@ -301,6 +312,7 @@ export class Product {
       originalPrice: this.originalPrice,
       affiliateLink: this.affiliateLink,
       images: this.images,
+      bundles: this.bundles,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
@@ -323,6 +335,7 @@ interface ProductProps {
   originalPrice: Money | null;
   affiliateLink: string | null;
   images: ProductImage[];
+  bundles: ProductBundle[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -344,6 +357,7 @@ export interface CreateProductProps {
   originalPrice?: number | null;
   affiliateLink?: string | null;
   images?: ProductImage[];
+  bundles?: ProductBundle[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -394,6 +408,7 @@ export interface ProductDatabaseRow {
   created_at: string;
   updated_at: string;
   images?: ProductImageDatabaseRow[];
+  bundles?: ProductBundleDatabaseRow[];
 }
 
 /**
@@ -450,6 +465,7 @@ export interface ProductResponse {
   hasDiscount: boolean;
   discountPercentage: number;
   images: ProductImageResponse[];
+  bundles: ProductBundleResponse[];
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -463,4 +479,186 @@ export interface ProductImageResponse {
   url: string;
   position: number;
   createdAt: string | null;
+}
+
+/**
+ * Product Bundle Value Object
+ *
+ * Represents a bundle pricing option for a product.
+ * e.g., "Buy 3 - Save 15%" = 3 items for a discounted price
+ */
+export class ProductBundle {
+  readonly id: string;
+  readonly productId: string;
+  readonly name: string;
+  readonly bundleQty: number;
+  readonly bundlePrice: number;
+  readonly isActive: boolean;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+
+  private constructor(props: ProductBundleProps) {
+    this.id = props.id;
+    this.productId = props.productId;
+    this.name = props.name;
+    this.bundleQty = props.bundleQty;
+    this.bundlePrice = props.bundlePrice;
+    this.isActive = props.isActive;
+    this.createdAt = props.createdAt;
+    this.updatedAt = props.updatedAt;
+  }
+
+  /**
+   * Factory method to create a new ProductBundle
+   */
+  static create(props: CreateProductBundleProps): ProductBundle {
+    return new ProductBundle({
+      id: props.id,
+      productId: props.productId,
+      name: props.name,
+      bundleQty: props.bundleQty,
+      bundlePrice: props.bundlePrice,
+      isActive: props.isActive ?? true,
+      createdAt: props.createdAt ?? new Date(),
+      updatedAt: props.updatedAt ?? new Date(),
+    });
+  }
+
+  /**
+   * Create ProductBundle from database row
+   */
+  static fromDatabase(row: ProductBundleDatabaseRow): ProductBundle {
+    return new ProductBundle({
+      id: row.id,
+      productId: row.product_id,
+      name: row.name,
+      bundleQty: row.bundle_qty,
+      bundlePrice: row.bundle_price,
+      isActive: row.is_active ?? true,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    });
+  }
+
+  /**
+   * Calculate unit price (price per item in bundle)
+   */
+  getUnitPrice(): number {
+    return this.bundlePrice / this.bundleQty;
+  }
+
+  /**
+   * Calculate savings compared to single unit price
+   */
+  getSavingsPercentage(singlePrice: number): number {
+    const bundleUnitPrice = this.getUnitPrice();
+    if (singlePrice <= 0) return 0;
+    return Math.round(((singlePrice - bundleUnitPrice) / singlePrice) * 100);
+  }
+
+  /**
+   * Convert to plain object for response
+   */
+  toResponse(): ProductBundleResponse {
+    return {
+      id: this.id,
+      productId: this.productId,
+      name: this.name,
+      bundleQty: this.bundleQty,
+      bundlePrice: this.bundlePrice,
+      bundlePriceFormatted: `₱${this.bundlePrice.toFixed(2)}`,
+      unitPrice: this.getUnitPrice(),
+      isActive: this.isActive,
+      createdAt:
+        this.createdAt && !Number.isNaN(this.createdAt.getTime())
+          ? this.createdAt.toISOString()
+          : null,
+      updatedAt:
+        this.updatedAt && !Number.isNaN(this.updatedAt.getTime())
+          ? this.updatedAt.toISOString()
+          : null,
+    };
+  }
+
+  private toProps(): ProductBundleProps {
+    return {
+      id: this.id,
+      productId: this.productId,
+      name: this.name,
+      bundleQty: this.bundleQty,
+      bundlePrice: this.bundlePrice,
+      isActive: this.isActive,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+    };
+  }
+}
+
+/**
+ * ProductBundle properties (internal)
+ */
+interface ProductBundleProps {
+  id: string;
+  productId: string;
+  name: string;
+  bundleQty: number;
+  bundlePrice: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Properties for creating a new ProductBundle
+ */
+export interface CreateProductBundleProps {
+  id: string;
+  productId: string;
+  name: string;
+  bundleQty: number;
+  bundlePrice: number;
+  isActive?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/**
+ * Properties for updating a ProductBundle
+ */
+export interface UpdateProductBundleProps {
+  id?: string;
+  name?: string;
+  bundleQty?: number;
+  bundlePrice?: number;
+  isActive?: boolean;
+}
+
+/**
+ * ProductBundle database row (snake_case from Supabase)
+ */
+export interface ProductBundleDatabaseRow {
+  id: string;
+  product_id: string;
+  name: string;
+  bundle_qty: number;
+  bundle_price: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * ProductBundle API Response
+ */
+export interface ProductBundleResponse {
+  id: string;
+  productId: string;
+  name: string;
+  bundleQty: number;
+  bundlePrice: number;
+  bundlePriceFormatted: string;
+  unitPrice: number;
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
 }

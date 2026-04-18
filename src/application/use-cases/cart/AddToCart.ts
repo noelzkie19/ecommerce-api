@@ -21,6 +21,7 @@ export interface AddToCartInput {
   userId?: string;
   guestId?: string;
   productId: string;
+  productBundleId?: string;
   quantity: number;
 }
 
@@ -89,6 +90,7 @@ export class AddToCartUseCase {
 
     const dto: AddToCartDTO = {
       productId: input.productId,
+      productBundleId: input.productBundleId,
       quantity: input.quantity,
     };
 

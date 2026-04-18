@@ -138,6 +138,7 @@ export class PlaceOrderUseCase {
       orderId,
       orderItems.map((item) => ({
         productId: item.productId,
+        productBundleId: item.productBundleId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
       })),
@@ -212,13 +213,21 @@ export class PlaceOrderUseCase {
   ): {
     subtotal: number;
     shipping: number;
-    orderItems: { productId: string; quantity: number; unitPrice: number; productName: string; productDescription: string }[],
+    orderItems: {
+      productId: string;
+      productBundleId?: string;
+      quantity: number;
+      unitPrice: number;
+      productName: string;
+      productDescription: string;
+    }[];
     discount: number;
     total: number;
   } {
     let subtotal = 0;
     const orderItems: {
       productId: string;
+      productBundleId?: string;
       quantity: number;
       unitPrice: number;
       productName: string;
@@ -229,12 +238,17 @@ export class PlaceOrderUseCase {
       if (!item.product) {
         throw new Error(`Product not found for cart item ${item.id}`);
       }
-      const itemTotal = item.product.price * item.quantity;
+
+      // Use bundle price if a bundle is selected, otherwise use regular price
+      const unitPrice = item.productBundle?.bundlePrice ?? item.product.price;
+      const itemTotal = unitPrice * item.quantity;
       subtotal += itemTotal;
+
       orderItems.push({
         productId: item.productId,
+        productBundleId: item.productBundleId ?? undefined,
         quantity: item.quantity,
-        unitPrice: item.product.price,
+        unitPrice,
         productName: item.product.name,
         productDescription: item.product.description ?? "",
       });
@@ -354,20 +368,20 @@ export class PlaceOrderUseCase {
    * Stock has already been validated before this point.
    */
   private async deductStock(
-    orderItems: { productId: string; quantity: number }[],
+    orderItems: {
+      productId: string;
+      productBundleId?: string;
+      quantity: number;
+    }[],
   ): Promise<void> {
-    for (const item of orderItems) {
-      const currentStock = await this.stockRepository.findByProductId(
-        item.productId,
-      );
-      const newQuantity = Math.max(
-        0,
-        (currentStock?.quantity ?? 0) - item.quantity,
-      );
-      await this.stockRepository.upsert(item.productId, {
-        quantity: newQuantity,
-      });
-    }
+    // Use the order repository's built-in deductStock method
+    // which handles bundles correctly
+    const stockDeductionItems = orderItems.map((item) => ({
+      productId: item.productId,
+      productBundleId: item.productBundleId,
+      quantity: item.quantity,
+    }));
+    await this.orderRepository.deductStock(stockDeductionItems);
   }
 
   /**

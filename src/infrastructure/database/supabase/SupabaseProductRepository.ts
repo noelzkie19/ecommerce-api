@@ -18,12 +18,16 @@ import {
   UpdateProductProps,
   ProductImage,
   ProductImageDatabaseRow,
+  ProductBundle,
+  ProductBundleDatabaseRow,
+  CreateProductBundleProps,
+  UpdateProductBundleProps,
 } from "../../../domain/entities/Product";
 
 const db = supabaseAdmin as any;
 
 /**
- * Supabase nested select for product_images, ordered by position
+ * Supabase nested select for product_images only (used in most queries)
  */
 const PRODUCT_WITH_IMAGES_SELECT = `
   *,
@@ -37,15 +41,44 @@ const PRODUCT_WITH_IMAGES_SELECT = `
 ` as const;
 
 /**
- * Normalise raw Supabase row so images are always an array sorted by position
+ * Supabase nested select for product_images and product_bundles
+ */
+const PRODUCT_WITH_IMAGES_AND_BUNDLES_SELECT = `
+  *,
+  images:product_images (
+    id,
+    product_id,
+    url,
+    position,
+    created_at
+  ),
+  bundles:product_bundles (
+    id,
+    product_id,
+    name,
+    bundle_qty,
+    bundle_price,
+    is_active,
+    created_at,
+    updated_at
+  )
+` as const;
+
+/**
+ * Normalise raw Supabase row so images and bundles are always arrays
  */
 function normaliseProduct(row: Record<string, unknown>) {
   const images = Array.isArray(row.images) ? row.images : [];
+  const bundles = Array.isArray(row.bundles) ? row.bundles : [];
   return {
     ...row,
     images: [...images].sort(
       (a: { position: number }, b: { position: number }) =>
         a.position - b.position,
+    ),
+    bundles: [...bundles].sort(
+      (a: { bundle_qty: number }, b: { bundle_qty: number }) =>
+        a.bundle_qty - b.bundle_qty,
     ),
   };
 }
@@ -141,7 +174,7 @@ export class SupabaseProductRepository implements IProductRepository {
       // Build query with filters
       query = db
         .from("products")
-        .select(PRODUCT_WITH_IMAGES_SELECT, { count: "exact" })
+        .select(PRODUCT_WITH_IMAGES_AND_BUNDLES_SELECT, { count: "exact" })
         .in("id", productIds)
         .range(from, to)
         .order("created_at", { ascending: false });
@@ -149,7 +182,7 @@ export class SupabaseProductRepository implements IProductRepository {
       // Standard product listing without storeId
       query = db
         .from("products")
-        .select(PRODUCT_WITH_IMAGES_SELECT, { count: "exact" })
+        .select(PRODUCT_WITH_IMAGES_AND_BUNDLES_SELECT, { count: "exact" })
         .range(from, to)
         .order("created_at", { ascending: false });
     }
@@ -181,7 +214,7 @@ export class SupabaseProductRepository implements IProductRepository {
   async findById(id: string): Promise<Product | null> {
     const { data, error } = await db
       .from("products")
-      .select(PRODUCT_WITH_IMAGES_SELECT)
+      .select(PRODUCT_WITH_IMAGES_AND_BUNDLES_SELECT)
       .eq("id", id)
       .single();
 
@@ -409,6 +442,118 @@ export class SupabaseProductRepository implements IProductRepository {
       .single();
 
     return (data as { position: number } | null)?.position ?? -1;
+  }
+
+  /**
+   * Find all bundles for a product
+   */
+  async findBundlesByProductId(productId: string): Promise<ProductBundle[]> {
+    const { data, error } = await db
+      .from("product_bundles")
+      .select("*")
+      .eq("product_id", productId)
+      .eq("is_active", true)
+      .order("bundle_qty", { ascending: true });
+
+    if (error) throw new AppError(error.message, 500);
+
+    return (data ?? []).map((row: ProductBundleDatabaseRow) =>
+      ProductBundle.fromDatabase(row),
+    );
+  }
+
+  /**
+   * Find a single bundle by ID
+   */
+  async findBundleById(bundleId: string): Promise<ProductBundle | null> {
+    const { data, error } = await db
+      .from("product_bundles")
+      .select("*")
+      .eq("id", bundleId)
+      .single();
+
+    if (error || !data) return null;
+
+    return ProductBundle.fromDatabase(data as ProductBundleDatabaseRow);
+  }
+
+  /**
+   * Create bundles for a product
+   */
+  async createBundles(
+    productId: string,
+    bundles: CreateProductBundleProps[],
+  ): Promise<ProductBundle[]> {
+    const payload = bundles.map((bundle) => ({
+      product_id: productId,
+      name: bundle.name,
+      bundle_qty: bundle.bundleQty,
+      bundle_price: bundle.bundlePrice,
+      is_active: bundle.isActive ?? true,
+    }));
+
+    const { data, error } = await db
+      .from("product_bundles")
+      .insert(payload)
+      .select("*");
+
+    if (error) throw new AppError(error.message, 500);
+
+    return (data ?? []).map((row: ProductBundleDatabaseRow) =>
+      ProductBundle.fromDatabase(row),
+    );
+  }
+
+  /**
+   * Update bundles for a product (replaces all existing)
+   */
+  async updateBundles(
+    productId: string,
+    bundles: UpdateProductBundleProps[],
+  ): Promise<ProductBundle[]> {
+    // First delete all existing bundles
+    const { error: deleteError } = await db
+      .from("product_bundles")
+      .delete()
+      .eq("product_id", productId);
+
+    if (deleteError) throw new AppError(deleteError.message, 500);
+
+    // Then insert new bundles
+    if (bundles.length === 0) {
+      return [];
+    }
+
+    const payload = bundles.map((bundle) => ({
+      product_id: productId,
+      name: bundle.name,
+      bundle_qty: bundle.bundleQty,
+      bundle_price: bundle.bundlePrice,
+      is_active: bundle.isActive ?? true,
+    }));
+
+    const { data, error } = await db
+      .from("product_bundles")
+      .insert(payload)
+      .select("*");
+
+    if (error) throw new AppError(error.message, 500);
+
+    return (data ?? []).map((row: ProductBundleDatabaseRow) =>
+      ProductBundle.fromDatabase(row),
+    );
+  }
+
+  /**
+   * Delete a bundle
+   */
+  async deleteBundle(bundleId: string): Promise<void> {
+    const { error } = await db
+      .from("product_bundles")
+      .delete()
+      .eq("id", bundleId);
+
+    if (error) throw new AppError("Bundle not found", 404);
   }
 }
 

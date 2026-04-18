@@ -45,6 +45,7 @@ export const addToCart = catchAsync(
       userId: owner.userId,
       guestId: owner.guestId,
       productId: dto.productId,
+      productBundleId: dto.productBundleId,
       quantity: dto.quantity,
     });
 
