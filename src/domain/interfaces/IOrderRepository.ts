@@ -126,6 +126,7 @@ export interface IOrderRepository {
 export interface StockDeductionItem {
   productId: string;
   quantity: number;
+  productBundleId?: string;
 }
 
 /**
@@ -133,6 +134,7 @@ export interface StockDeductionItem {
  */
 export interface CreateOrderItem {
   productId: string;
+  productBundleId?: string;
   quantity: number;
   unitPrice: number;
 }

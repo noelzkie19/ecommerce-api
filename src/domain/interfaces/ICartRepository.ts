@@ -19,6 +19,7 @@ export interface CartOwner {
  */
 export interface AddToCartDTO {
   productId: string;
+  productBundleId?: string;
   quantity: number;
 }
 
@@ -30,9 +31,16 @@ export interface CartItem {
   userId: string | null;
   guestId: string | null;
   productId: string;
+  productBundleId?: string | null;
   quantity: number;
   createdAt: string;
   updatedAt: string;
+  productBundle?: {
+    id: string;
+    name: string;
+    bundleQty: number;
+    bundlePrice: number;
+  } | null;
   product?: {
     id: string;
     name: string;
