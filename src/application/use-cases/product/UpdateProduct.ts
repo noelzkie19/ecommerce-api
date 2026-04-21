@@ -8,6 +8,7 @@ import { IProductRepository } from "../../../domain/interfaces/IProductRepositor
 import { UpdateProductProps } from "../../../domain/entities/Product";
 import { Currency } from "../../../domain/value-objects/Money";
 import { resolve, TOKENS } from "../../../di/container";
+import { isValidYouTubeUrl } from "../../../common/utils/videoValidator";
 
 /**
  * Input DTO for UpdateProductUseCase
@@ -25,6 +26,7 @@ export interface UpdateProductInput {
   reviewCount?: number | null;
   originalPrice?: number | null;
   affiliateLink?: string | null;
+  videoUrl?: string | null;
   bundles?: Array<{
     name: string;
     bundleQty: number;
@@ -79,6 +81,15 @@ export class UpdateProductUseCase {
    * Execute the use case
    */
   async execute(input: UpdateProductInput): Promise<UpdateProductOutput> {
+    // Validate videoUrl if provided and not null
+    if (input.videoUrl && input.videoUrl.length > 0) {
+      if (!isValidYouTubeUrl(input.videoUrl)) {
+        throw new Error(
+          "Invalid YouTube URL. Please use a valid YouTube URL (youtube.com/watch?v= or youtu.be/)",
+        );
+      }
+    }
+
     const updateData: Partial<UpdateProductProps> = {
       name: input.name,
       description: input.description,
@@ -91,6 +102,8 @@ export class UpdateProductUseCase {
       reviewCount: input.reviewCount,
       originalPrice: input.originalPrice,
       affiliateLink: input.affiliateLink,
+      videoUrl: input.videoUrl,
+      videoTag: input.videoUrl && input.videoUrl.length > 0 ? "default" : null,
     };
 
     // Remove undefined values
