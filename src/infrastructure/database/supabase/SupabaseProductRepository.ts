@@ -310,6 +310,8 @@ export class SupabaseProductRepository implements IProductRepository {
       review_count: props.reviewCount ?? null,
       original_price: props.originalPrice ?? null,
       affiliate_link: props.affiliateLink ?? null,
+      video_url: props.videoUrl ?? null,
+      video_tag: props.videoTag ?? "default",
     };
 
     const { data, error } = await db
@@ -341,6 +343,8 @@ export class SupabaseProductRepository implements IProductRepository {
         review_count: data.reviewCount,
         original_price: data.originalPrice,
         affiliate_link: data.affiliateLink,
+        video_url: data.videoUrl,
+        video_tag: data.videoTag,
       }).filter(([, v]) => v !== undefined),
     );
 

@@ -8,6 +8,7 @@ import { IProductRepository } from "../../../domain/interfaces/IProductRepositor
 import { CreateProductProps } from "../../../domain/entities/Product";
 import { Currency } from "../../../domain/value-objects/Money";
 import { resolve, TOKENS } from "../../../di/container";
+import { isValidYouTubeUrl } from "../../../common/utils/videoValidator";
 
 /**
  * Input DTO for CreateProductUseCase
@@ -24,6 +25,7 @@ export interface CreateProductInput {
   reviewCount?: number | null;
   originalPrice?: number | null;
   affiliateLink?: string | null;
+  videoUrl?: string | null;
   bundles?: Array<{
     name: string;
     bundleQty: number;
@@ -70,6 +72,15 @@ export class CreateProductUseCase {
    * Execute the use case
    */
   async execute(input: CreateProductInput): Promise<CreateProductOutput> {
+    // Validate videoUrl if provided
+    if (input.videoUrl && input.videoUrl.length > 0) {
+      if (!isValidYouTubeUrl(input.videoUrl)) {
+        throw new Error(
+          "Invalid YouTube URL. Please use a valid YouTube URL (youtube.com/watch?v= or youtu.be/)",
+        );
+      }
+    }
+
     const productProps: CreateProductProps = {
       id: crypto.randomUUID(),
       name: input.name,
@@ -83,6 +94,8 @@ export class CreateProductUseCase {
       reviewCount: input.reviewCount,
       originalPrice: input.originalPrice,
       affiliateLink: input.affiliateLink,
+      videoUrl: input.videoUrl ?? null,
+      videoTag: input.videoUrl ? "default" : null,
     };
 
     const product = await this.productRepository.create(productProps);

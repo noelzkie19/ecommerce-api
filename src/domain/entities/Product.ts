@@ -6,6 +6,7 @@
  */
 
 import { Money, Currency } from "../value-objects/Money";
+import { getYouTubeEmbedUrl } from "../../common/utils/videoValidator";
 
 export type ProductStatus = "active" | "inactive" | "draft";
 
@@ -76,6 +77,8 @@ export class Product {
   readonly reviewCount: number | null;
   readonly originalPrice: Money | null;
   readonly affiliateLink: string | null;
+  readonly videoUrl: string | null;
+  readonly videoTag: string | null;
   readonly images: ProductImage[];
   readonly bundles!: ProductBundle[];
   readonly createdAt: Date;
@@ -93,6 +96,8 @@ export class Product {
     this.reviewCount = props.reviewCount;
     this.originalPrice = props.originalPrice;
     this.affiliateLink = props.affiliateLink;
+    this.videoUrl = props.videoUrl;
+    this.videoTag = props.videoTag;
     this.images = props.images;
     this.bundles = props.bundles;
     this.createdAt = props.createdAt;
@@ -117,6 +122,8 @@ export class Product {
         ? Money.create(props.originalPrice, props.currency ?? "PHP")
         : null,
       affiliateLink: props.affiliateLink ?? null,
+      videoUrl: props.videoUrl ?? null,
+      videoTag: props.videoTag ?? "default",
       images: props.images ?? [],
       bundles: props.bundles ?? [],
       createdAt: props.createdAt ?? new Date(),
@@ -154,6 +161,8 @@ export class Product {
         ? Money.create(row.original_price, "PHP")
         : null,
       affiliateLink: row.affiliate_link,
+      videoUrl: row.video_url ?? null,
+      videoTag: row.video_tag ?? "default",
       images,
       bundles,
       createdAt: new Date(row.created_at),
@@ -195,6 +204,23 @@ export class Product {
       return sorted[0].url;
     }
     return this.imageUrl;
+  }
+
+  /**
+   * Check if product has a video
+   */
+  hasVideo(): boolean {
+    return this.videoUrl !== null && this.videoUrl.length > 0;
+  }
+
+  /**
+   * Get YouTube embed URL
+   */
+  getVideoEmbedUrl(): string | null {
+    if (!this.hasVideo()) {
+      return null;
+    }
+    return getYouTubeEmbedUrl(this.videoUrl!);
   }
 
   /**
@@ -283,6 +309,9 @@ export class Product {
       originalPrice: this.originalPrice?.amount ?? null,
       originalPriceFormatted: this.originalPrice?.format() ?? null,
       affiliateLink: this.affiliateLink,
+      videoUrl: this.videoUrl,
+      videoTag: this.videoTag,
+      videoEmbedUrl: this.getVideoEmbedUrl(),
       hasDiscount: this.hasDiscount(),
       discountPercentage: Math.round(this.getDiscountPercentage()),
       images: this.images.map((img) => img.toResponse()),
@@ -311,6 +340,8 @@ export class Product {
       reviewCount: this.reviewCount,
       originalPrice: this.originalPrice,
       affiliateLink: this.affiliateLink,
+      videoUrl: this.videoUrl,
+      videoTag: this.videoTag,
       images: this.images,
       bundles: this.bundles,
       createdAt: this.createdAt,
@@ -334,6 +365,8 @@ interface ProductProps {
   reviewCount: number | null;
   originalPrice: Money | null;
   affiliateLink: string | null;
+  videoUrl: string | null;
+  videoTag: string | null;
   images: ProductImage[];
   bundles: ProductBundle[];
   createdAt: Date;
@@ -356,6 +389,8 @@ export interface CreateProductProps {
   reviewCount?: number | null;
   originalPrice?: number | null;
   affiliateLink?: string | null;
+  videoUrl?: string | null;
+  videoTag?: string | null;
   images?: ProductImage[];
   bundles?: ProductBundle[];
   createdAt?: Date;
@@ -377,6 +412,8 @@ export interface UpdateProductProps {
   reviewCount?: number | null;
   originalPrice?: number | null;
   affiliateLink?: string | null;
+  videoUrl?: string | null;
+  videoTag?: string | null;
 }
 
 /**
@@ -405,6 +442,8 @@ export interface ProductDatabaseRow {
   review_count: number | null;
   original_price: number | null;
   affiliate_link: string | null;
+  video_url: string | null;
+  video_tag: string | null;
   created_at: string;
   updated_at: string;
   images?: ProductImageDatabaseRow[];
@@ -462,6 +501,9 @@ export interface ProductResponse {
   originalPrice: number | null;
   originalPriceFormatted: string | null;
   affiliateLink: string | null;
+  videoUrl: string | null;
+  videoTag: string | null;
+  videoEmbedUrl: string | null;
   hasDiscount: boolean;
   discountPercentage: number;
   images: ProductImageResponse[];

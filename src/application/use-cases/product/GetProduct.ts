@@ -32,6 +32,9 @@ export interface GetProductOutput {
   originalPrice: number | null;
   originalPriceFormatted: string | null;
   affiliateLink: string | null;
+  videoUrl: string | null;
+  videoTag: string | null;
+  videoEmbedUrl: string | null;
   hasDiscount: boolean;
   discountPercentage: number;
   images: Array<{
