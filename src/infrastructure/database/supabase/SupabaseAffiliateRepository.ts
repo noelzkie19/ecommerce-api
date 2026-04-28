@@ -74,7 +74,17 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
       .eq("id", id)
       .single();
 
-    if (error) return null;
+    if (error) {
+      // PGRST116 = zero rows returned (not found) - this is the expected "not found" case
+      if (error.code === "PGRST116" || error.message?.includes("0 rows")) {
+        return null;
+      }
+      // For any other error, throw so we can see the actual problem (schema issues, permissions, etc.)
+      throw new AppError(
+        `Database error in findById: ${error.message} (code: ${error.code})`,
+        500,
+      );
+    }
     return Affiliate.fromDatabase(data);
   }
 
@@ -88,7 +98,15 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
       .eq("user_id", userId)
       .single();
 
-    if (error) return null;
+    if (error) {
+      if (error.code === "PGRST116" || error.message?.includes("0 rows")) {
+        return null;
+      }
+      throw new AppError(
+        `Database error in findByUserId: ${error.message} (code: ${error.code})`,
+        500,
+      );
+    }
     return Affiliate.fromDatabase(data);
   }
 
@@ -102,7 +120,15 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
       .eq("email", email)
       .single();
 
-    if (error) return null;
+    if (error) {
+      if (error.code === "PGRST116" || error.message?.includes("0 rows")) {
+        return null;
+      }
+      throw new AppError(
+        `Database error in findByEmail: ${error.message} (code: ${error.code})`,
+        500,
+      );
+    }
     return Affiliate.fromDatabase(data);
   }
 
@@ -223,6 +249,9 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
         total_sales: data.totalSales,
         total_commissions: data.totalCommissions,
         affiliate_commission: data.affiliateCommission,
+        payment_proof_url: data.paymentProofUrl,
+        payment_proof_ref: data.paymentProofRef,
+        payment_proof_submitted_at: data.paymentProofSubmittedAt,
       }).filter(([, v]) => v !== undefined),
     );
 
@@ -233,7 +262,15 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
       .select("*")
       .single();
 
-    if (error) throw new AppError("Affiliate not found", 404);
+    if (error) {
+      if (error.code === "PGRST116" || error.message?.includes("0 rows")) {
+        throw new AppError("Affiliate not found", 404);
+      }
+      throw new AppError(
+        `Failed to update affiliate: ${error.message} (code: ${error.code})`,
+        500,
+      );
+    }
     return Affiliate.fromDatabase(updated);
   }
 
@@ -242,7 +279,15 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
    */
   async delete(id: string): Promise<void> {
     const { error } = await db.from("affiliates").delete().eq("id", id);
-    if (error) throw new AppError("Affiliate not found", 404);
+    if (error) {
+      if (error.code === "PGRST116" || error.message?.includes("0 rows")) {
+        throw new AppError("Affiliate not found", 404);
+      }
+      throw new AppError(
+        `Failed to delete affiliate: ${error.message} (code: ${error.code})`,
+        500,
+      );
+    }
   }
 
   /**
@@ -329,7 +374,15 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
       .select("*")
       .single();
 
-    if (error) throw new AppError("Affiliate not found", 404);
+    if (error) {
+      if (error.code === "PGRST116" || error.message?.includes("0 rows")) {
+        throw new AppError("Affiliate not found", 404);
+      }
+      throw new AppError(
+        `Failed to update pixel: ${error.message} (code: ${error.code})`,
+        500,
+      );
+    }
     return Affiliate.fromDatabase(data);
   }
 
@@ -364,7 +417,18 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
       .eq("id", affiliateId)
       .single();
 
-    if (fetchError) throw new AppError("Affiliate not found", 404);
+    if (fetchError) {
+      if (
+        fetchError.code === "PGRST116" ||
+        fetchError.message?.includes("0 rows")
+      ) {
+        throw new AppError("Affiliate not found", 404);
+      }
+      throw new AppError(
+        `Failed to fetch affiliate totals: ${fetchError.message} (code: ${fetchError.code})`,
+        500,
+      );
+    }
 
     const newTotalSales = (affiliate.total_sales ?? 0) + saleAmount;
     const newTotalCommissions =
@@ -536,6 +600,132 @@ export class SupabaseAffiliateRepository implements IAffiliateRepository {
     }
 
     return this.getSettings();
+  }
+
+  /**
+   * Submit payment proof for affiliate registration
+   */
+  async submitPaymentProof(
+    userId: string,
+    proofUrl: string,
+    proofRef?: string,
+  ): Promise<void> {
+    const { error } = await db
+      .from("affiliates")
+      .update({
+        payment_proof_url: proofUrl,
+        payment_proof_ref: proofRef ?? null,
+        payment_proof_submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+
+    if (error) {
+      throw new AppError("Failed to submit payment proof", 500);
+    }
+  }
+
+  /**
+   * Approve an affiliate (admin action)
+   */
+  async approveAffiliate(
+    affiliateId: string,
+    adminId: string,
+  ): Promise<Affiliate> {
+    const { data, error } = await db
+      .from("affiliates")
+      .update({
+        status: "active",
+        payment_status: "paid",
+        approved_by: adminId,
+        approved_at: new Date().toISOString(),
+        rejection_reason: null, // Clear any previous rejection
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", affiliateId)
+      .select("*")
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116" || error.message?.includes("0 rows")) {
+        throw new AppError("Affiliate not found", 404);
+      }
+      throw new AppError(
+        `Failed to approve affiliate: ${error.message} (code: ${error.code})`,
+        500,
+      );
+    }
+    return Affiliate.fromDatabase(data);
+  }
+
+  /**
+   * Reject an affiliate (admin action)
+   */
+  async rejectAffiliate(
+    affiliateId: string,
+    reason?: string,
+  ): Promise<Affiliate> {
+    const { data, error } = await db
+      .from("affiliates")
+      .update({
+        status: "rejected",
+        rejection_reason: reason ?? null,
+        payment_proof_url: null,
+        payment_proof_ref: null,
+        payment_proof_submitted_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", affiliateId)
+      .select("*")
+      .single();
+
+    if (error) {
+      // PGRST116 = zero rows updated (affiliate not found)
+      if (error.code === "PGRST116" || error.message?.includes("0 rows")) {
+        throw new AppError("Affiliate not found", 404);
+      }
+      // For other errors, provide actual error info
+      throw new AppError(
+        `Failed to reject affiliate: ${error.message} (code: ${error.code})`,
+        500,
+      );
+    }
+    return Affiliate.fromDatabase(data);
+  }
+
+  /**
+   * Upload payment proof image for an affiliate
+   */
+  async uploadPaymentProofImage(
+    affiliateId: string,
+    imageUrl: string,
+    proofRef?: string,
+  ): Promise<void> {
+    const { error } = await db
+      .from("affiliates")
+      .update({
+        payment_status: "paid",
+        payment_proof_url: imageUrl,
+        payment_proof_ref: proofRef ?? null,
+        payment_proof_submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", affiliateId);
+
+    if (error) {
+      console.error("Database error in uploadPaymentProofImage:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        affiliateId,
+        imageUrl,
+      });
+      throw new AppError(
+        `Failed to upload payment proof: ${error.message}`,
+        500,
+      );
+    }
   }
 }
 

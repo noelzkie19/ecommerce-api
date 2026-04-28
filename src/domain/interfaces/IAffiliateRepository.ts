@@ -156,6 +156,34 @@ export interface IAffiliateRepository {
   updateSettings(
     settings: Partial<AffiliateSettings>,
   ): Promise<AffiliateSettings>;
+
+  /**
+   * Submit payment proof for affiliate registration
+   */
+  submitPaymentProof(
+    userId: string,
+    proofUrl: string,
+    proofRef?: string,
+  ): Promise<void>;
+
+  /**
+   * Approve an affiliate (admin action)
+   */
+  approveAffiliate(affiliateId: string, adminId: string): Promise<Affiliate>;
+
+  /**
+   * Reject an affiliate (admin action)
+   */
+  rejectAffiliate(affiliateId: string, reason?: string): Promise<Affiliate>;
+
+  /**
+   * Upload payment proof image for an affiliate
+   */
+  uploadPaymentProofImage(
+    affiliateId: string,
+    imageUrl: string,
+    proofRef?: string,
+  ): Promise<void>;
 }
 
 /**

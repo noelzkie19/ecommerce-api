@@ -15,7 +15,7 @@ export interface UpdateAffiliateInput {
   affiliateId: string;
   name?: string;
   email?: string;
-  status?: "pending" | "active" | "suspended";
+  status?: "pending" | "active" | "suspended" | "rejected";
   paymentStatus?: "paid" | "unpaid";
   pixelId?: string | null;
   storeId?: string | null;
@@ -39,6 +39,12 @@ export interface UpdateAffiliateOutput {
   totalSales: number;
   totalCommissions: number;
   affiliateCommission: number;
+  paymentProofUrl: string | null;
+  paymentProofRef: string | null;
+  paymentProofSubmittedAt: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  rejectionReason: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }

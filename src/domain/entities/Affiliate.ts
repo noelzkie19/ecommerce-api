@@ -5,7 +5,7 @@
  * This is a core domain entity that contains pure business logic.
  */
 
-export type AffiliateStatus = "pending" | "active" | "suspended";
+export type AffiliateStatus = "pending" | "active" | "suspended" | "rejected";
 export type PaymentStatus = "paid" | "unpaid";
 export type ConversionValueType = "sale_amount" | "commission" | "fixed";
 
@@ -31,6 +31,12 @@ export class Affiliate {
   readonly totalSales: number;
   readonly totalCommissions: number;
   readonly affiliateCommission: number;
+  readonly paymentProofUrl: string | null;
+  readonly paymentProofRef: string | null;
+  readonly paymentProofSubmittedAt: Date | null;
+  readonly approvedBy: string | null;
+  readonly approvedAt: Date | null;
+  readonly rejectionReason: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 
@@ -53,6 +59,12 @@ export class Affiliate {
     this.totalSales = props.totalSales;
     this.totalCommissions = props.totalCommissions;
     this.affiliateCommission = props.affiliateCommission;
+    this.paymentProofUrl = props.paymentProofUrl ?? null;
+    this.paymentProofRef = props.paymentProofRef ?? null;
+    this.paymentProofSubmittedAt = props.paymentProofSubmittedAt ?? null;
+    this.approvedBy = props.approvedBy ?? null;
+    this.approvedAt = props.approvedAt ?? null;
+    this.rejectionReason = props.rejectionReason ?? null;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
   }
@@ -80,6 +92,12 @@ export class Affiliate {
       totalSales: props.totalSales ?? 0,
       totalCommissions: props.totalCommissions ?? 0,
       affiliateCommission: props.affiliateCommission ?? 0,
+      paymentProofUrl: props.paymentProofUrl ?? null,
+      paymentProofRef: props.paymentProofRef ?? null,
+      paymentProofSubmittedAt: props.paymentProofSubmittedAt ?? null,
+      approvedBy: props.approvedBy ?? null,
+      approvedAt: props.approvedAt ?? null,
+      rejectionReason: props.rejectionReason ?? null,
       createdAt: props.createdAt ?? new Date(),
       updatedAt: props.updatedAt ?? new Date(),
     });
@@ -108,6 +126,14 @@ export class Affiliate {
       totalSales: row.total_sales ?? 0,
       totalCommissions: row.total_commissions ?? 0,
       affiliateCommission: row.affiliate_commission ?? 0,
+      paymentProofUrl: row.payment_proof_url ?? null,
+      paymentProofRef: row.payment_proof_ref ?? null,
+      paymentProofSubmittedAt: row.payment_proof_submitted_at
+        ? new Date(row.payment_proof_submitted_at)
+        : null,
+      approvedBy: row.approved_by ?? null,
+      approvedAt: row.approved_at ? new Date(row.approved_at) : null,
+      rejectionReason: row.rejection_reason ?? null,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     });
@@ -115,9 +141,13 @@ export class Affiliate {
 
   /**
    * Check if affiliate can be activated
+   * Either paid via PayMongo (legacy) OR has submitted payment proof
    */
   canBeActivated(): boolean {
-    return this.paymentStatus === "paid" && this.status === "pending";
+    return (
+      this.status === "pending" &&
+      (this.paymentStatus === "paid" || this.paymentProofSubmittedAt !== null)
+    );
   }
 
   /**
@@ -205,6 +235,14 @@ export class Affiliate {
       totalSales: this.totalSales,
       totalCommissions: this.totalCommissions,
       affiliateCommission: this.affiliateCommission,
+      paymentProofUrl: this.paymentProofUrl,
+      paymentProofRef: this.paymentProofRef,
+      paymentProofSubmittedAt: this.paymentProofSubmittedAt
+        ? this.paymentProofSubmittedAt.toISOString()
+        : null,
+      approvedBy: this.approvedBy,
+      approvedAt: this.approvedAt ? this.approvedAt.toISOString() : null,
+      rejectionReason: this.rejectionReason,
       createdAt:
         this.createdAt && !Number.isNaN(this.createdAt.getTime())
           ? this.createdAt.toISOString()
@@ -236,6 +274,12 @@ export class Affiliate {
       totalSales: this.totalSales,
       totalCommissions: this.totalCommissions,
       affiliateCommission: this.affiliateCommission,
+      paymentProofUrl: this.paymentProofUrl,
+      paymentProofRef: this.paymentProofRef,
+      paymentProofSubmittedAt: this.paymentProofSubmittedAt,
+      approvedBy: this.approvedBy,
+      approvedAt: this.approvedAt,
+      rejectionReason: this.rejectionReason,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
@@ -264,6 +308,12 @@ interface AffiliateProps {
   totalSales: number;
   totalCommissions: number;
   affiliateCommission: number;
+  paymentProofUrl: string | null;
+  paymentProofRef: string | null;
+  paymentProofSubmittedAt: Date | null;
+  approvedBy: string | null;
+  approvedAt: Date | null;
+  rejectionReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -290,6 +340,12 @@ export interface CreateAffiliateProps {
   totalSales?: number;
   totalCommissions?: number;
   affiliateCommission?: number;
+  paymentProofUrl?: string | null;
+  paymentProofRef?: string | null;
+  paymentProofSubmittedAt?: Date | null;
+  approvedBy?: string | null;
+  approvedAt?: Date | null;
+  rejectionReason?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -311,6 +367,12 @@ export interface AffiliateDatabaseRow {
   total_sales: number | null;
   total_commissions: number | null;
   affiliate_commission: number | null;
+  payment_proof_url: string | null;
+  payment_proof_ref: string | null;
+  payment_proof_submitted_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -337,6 +399,12 @@ export interface AffiliateResponse {
   totalSales: number;
   totalCommissions: number;
   affiliateCommission: number;
+  paymentProofUrl: string | null;
+  paymentProofRef: string | null;
+  paymentProofSubmittedAt: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  rejectionReason: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }

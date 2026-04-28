@@ -36,6 +36,12 @@ export interface ListAffiliatesOutput {
     totalSales: number;
     totalCommissions: number;
     affiliateCommission: number;
+    paymentProofUrl: string | null;
+    paymentProofRef: string | null;
+    paymentProofSubmittedAt: string | null;
+    approvedBy: string | null;
+    approvedAt: string | null;
+    rejectionReason: string | null;
     createdAt: string | null;
     updatedAt: string | null;
   }>;
