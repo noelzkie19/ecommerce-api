@@ -1,14 +1,13 @@
 import { Router } from "express";
+import multer from "multer";
 import { requireAuth, requireAdmin } from "../auth/auth.middleware";
 import * as affiliateController from "./affiliate.controller";
 
 const router = Router();
-
-// Public route: PayMongo webhook for affiliate payments
-router.post("/webhook", affiliateController.paymongoWebhook);
-
-// Public route: Verify payment callback (after GCash payment)
-router.get("/payment/verify", affiliateController.verifyAffiliatePayment);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});
 
 // Protected route: Get current user's affiliate status
 /**
@@ -38,7 +37,7 @@ router.get("/payment/verify", affiliateController.verifyAffiliatePayment);
  *                       format: uuid
  *                     status:
  *                       type: string
- *                       enum: [pending, active, suspended]
+ *                       enum: [pending, active, suspended, rejected]
  *                     paymentStatus:
  *                       type: string
  *                       enum: [unpaid, paid]
@@ -60,12 +59,54 @@ router.get("/payment/verify", affiliateController.verifyAffiliatePayment);
  */
 router.get("/me", requireAuth, affiliateController.getMyAffiliateStatus);
 
-// Protected route: Create payment for affiliate registration
+// Protected route: Submit payment proof (manual approval workflow)
 router.post(
-  "/payment/create",
+  "/me/payment-proof",
   requireAuth,
-  affiliateController.createAffiliatePayment,
+  affiliateController.submitPaymentProof,
 );
+
+// Protected route: Submit payment proof image (user self-upload)
+/**
+ * @openapi
+ * /api/affiliates/me/payment-proof-image:
+ *   post:
+ *     tags: [Affiliates]
+ *     summary: Upload payment proof image (User)
+ *     description: Allows an authenticated affiliate to upload an image file as payment proof. Supports JPEG, PNG, WEBP, GIF (max 5MB).
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *               proofRef:
+ *                 type: string
+ *                 description: Optional reference note
+ *     responses:
+ *       200:
+ *         description: Payment proof uploaded successfully
+ *       400:
+ *         description: Invalid file type or no file provided
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Affiliate not found
+ */
+router.post(
+  "/me/payment-proof-image",
+  requireAuth,
+  upload.single("image"),
+  affiliateController.uploadMyPaymentProofImage,
+);
+
+// // Protected route: Create payment for affiliate registration (DEPRECATED)
 
 /**
  * @openapi
@@ -122,6 +163,102 @@ router.get("/me/link", requireAuth, affiliateController.getMyAffiliateLink);
 // All other affiliate routes are admin-only
 router.use(requireAuth, requireAdmin);
 
+// ── Payment Proof Image Upload (Admin) ─────────────────────────────────────────
+
+/**
+ * @openapi
+ * /api/affiliates/{id}/payment-proof-image:
+ *   post:
+ *     tags: [Affiliates]
+ *     summary: Upload payment proof image for affiliate (Admin)
+ *     description: Upload an image file as payment proof for an affiliate. Supports JPEG, PNG, WEBP, GIF (max 5MB).
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *               proofRef:
+ *                 type: string
+ *                 description: Optional reference note
+ *     responses:
+ *       200:
+ *         description: Payment proof uploaded successfully
+ *       400:
+ *         description: Invalid file type or no file provided
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (admin only)
+ *       404:
+ *         description: Affiliate not found
+ */
+router.post(
+  "/:id/payment-proof-image",
+  upload.single("image"),
+  affiliateController.uploadPaymentProofImage,
+);
+
+// ── Add Payment Proof By Admin (Admin) ─────────────────────────────────────────
+
+/**
+ * @openapi
+ * /api/affiliates/{id}/payment-proof:
+ *   post:
+ *     tags: [Affiliates]
+ *     summary: Add payment proof for affiliate (Admin)
+ *     description: Admin adds payment proof for an affiliate (e.g., during manual approval).
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - paymentProofUrl
+ *             properties:
+ *               paymentProofUrl:
+ *                 type: string
+ *                 description: URL to payment proof (receipt, screenshot, etc.)
+ *               paymentProofRef:
+ *                 type: string
+ *                 description: Optional reference note
+ *     responses:
+ *       200:
+ *         description: Payment proof added successfully
+ *       400:
+ *         description: paymentProofUrl is required
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (admin only)
+ *       404:
+ *         description: Affiliate not found
+ */
+router.post("/:id/payment-proof", affiliateController.addPaymentProofByAdmin);
+
 // ── Affiliate collection ──────────────────────────────────────────────────────
 
 /**
@@ -153,7 +290,7 @@ router.use(requireAuth, requireAdmin);
  *         name: status
  *         schema:
  *           type: string
- *           enum: [active, suspended]
+ *           enum: [pending, active, suspended, rejected]
  *         description: Filter by status
  *     responses:
  *       200:
@@ -254,19 +391,20 @@ router.get("/:id", affiliateController.getAffiliate);
  *                 type: string
  *               email:
  *                 type: string
- *                 format: email
  *               status:
  *                 type: string
- *                 enum: [active, suspended]
+ *                 enum: [pending, active, suspended, rejected]
  *               pixelId:
  *                 type: string
- *                 description: Meta Pixel ID for tracking
+ *                 description: Meta Pixel ID
  *               storeId:
  *                 type: string
- *                 description: Store ID for affiliate
+ *                 description: Store ID
  *     responses:
  *       200:
  *         description: Affiliate updated
+ *       404:
+ *         description: Not found
  */
 router.patch("/:id", affiliateController.updateAffiliate);
 
@@ -287,11 +425,13 @@ router.patch("/:id", affiliateController.updateAffiliate);
  *           format: uuid
  *     responses:
  *       204:
- *         description: Deleted
+ *         description: Affiliate deleted
+ *       404:
+ *         description: Not found
  */
 router.delete("/:id", affiliateController.deleteAffiliate);
 
-// ── Suspend / Activate shortcuts ──────────────────────────────────────────────
+// ── Affiliate Status Changes ───────────────────────────────────────────────────
 
 /**
  * @openapi
@@ -311,6 +451,8 @@ router.delete("/:id", affiliateController.deleteAffiliate);
  *     responses:
  *       200:
  *         description: Affiliate suspended
+ *       404:
+ *         description: Not found
  */
 router.patch("/:id/suspend", affiliateController.suspendAffiliate);
 
@@ -332,8 +474,82 @@ router.patch("/:id/suspend", affiliateController.suspendAffiliate);
  *     responses:
  *       200:
  *         description: Affiliate activated
+ *       400:
+ *         description: Affiliate must complete payment or submit proof first
+ *       404:
+ *         description: Not found
  */
 router.patch("/:id/activate", affiliateController.activateAffiliate);
+
+/**
+ * @openapi
+ * /api/affiliates/{id}/approve:
+ *   post:
+ *     tags: [Affiliates]
+ *     summary: Approve affiliate (Admin)
+ *     description: Approve an affiliate application. Optionally accepts payment proof URL and reference.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               paymentProofUrl:
+ *                 type: string
+ *                 description: Optional payment proof URL
+ *               paymentProofRef:
+ *                 type: string
+ *                 description: Optional payment proof reference
+ *     responses:
+ *       200:
+ *         description: Affiliate approved
+ *       400:
+ *         description: Affiliate must complete payment or submit proof first
+ *       404:
+ *         description: Not found
+ */
+router.post("/:id/approve", affiliateController.approveAffiliate);
+
+/**
+ * @openapi
+ * /api/affiliates/{id}/reject:
+ *   post:
+ *     tags: [Affiliates]
+ *     summary: Reject affiliate (Admin)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Optional rejection reason
+ *     responses:
+ *       200:
+ *         description: Affiliate rejected
+ *       404:
+ *         description: Not found
+ */
+router.post("/:id/reject", affiliateController.rejectAffiliate);
 
 // ── Affiliate Products ────────────────────────────────────────────────────────
 
@@ -342,7 +558,7 @@ router.patch("/:id/activate", affiliateController.activateAffiliate);
  * /api/affiliates/{id}/products:
  *   get:
  *     tags: [Affiliates]
- *     summary: Get products assigned to an affiliate (Admin)
+ *     summary: Get affiliate products (Admin)
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -354,7 +570,9 @@ router.patch("/:id/activate", affiliateController.activateAffiliate);
  *           format: uuid
  *     responses:
  *       200:
- *         description: List of assigned products
+ *         description: Affiliate products
+ *       404:
+ *         description: Not found
  */
 router.get("/:id/products", affiliateController.getAffiliateProducts);
 
@@ -363,8 +581,7 @@ router.get("/:id/products", affiliateController.getAffiliateProducts);
  * /api/affiliates/{id}/products:
  *   post:
  *     tags: [Affiliates]
- *     summary: Assign a product to an affiliate (Admin)
- *     description: Assigns a product with a commission rule. Re-assigning the same product updates the commission.
+ *     summary: Assign product to affiliate (Admin)
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -391,15 +608,13 @@ router.get("/:id/products", affiliateController.getAffiliateProducts);
  *               commissionType:
  *                 type: string
  *                 enum: [percentage, fixed]
- *                 example: percentage
  *               commissionValue:
  *                 type: number
- *                 example: 20
  *     responses:
  *       201:
  *         description: Product assigned
- *       400:
- *         description: Validation error
+ *       404:
+ *         description: Not found
  */
 router.post("/:id/products", affiliateController.assignProduct);
 
@@ -408,7 +623,7 @@ router.post("/:id/products", affiliateController.assignProduct);
  * /api/affiliates/{id}/products/{productId}:
  *   delete:
  *     tags: [Affiliates]
- *     summary: Remove a product from an affiliate (Admin)
+ *     summary: Remove product from affiliate (Admin)
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -427,6 +642,8 @@ router.post("/:id/products", affiliateController.assignProduct);
  *     responses:
  *       204:
  *         description: Product removed
+ *       404:
+ *         description: Not found
  */
 router.delete("/:id/products/:productId", affiliateController.removeProduct);
 
@@ -438,12 +655,11 @@ router.delete("/:id/products/:productId", affiliateController.removeProduct);
  *   get:
  *     tags: [Affiliates]
  *     summary: Get affiliate settings (Admin)
- *     description: Retrieve commission rates and registration fee settings.
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Settings retrieved
+ *         description: Affiliate settings
  */
 router.get("/settings", affiliateController.getAffiliateSettings);
 
@@ -453,11 +669,9 @@ router.get("/settings", affiliateController.getAffiliateSettings);
  *   patch:
  *     tags: [Affiliates]
  *     summary: Update affiliate settings (Admin)
- *     description: Update commission rates and registration fee.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
@@ -465,37 +679,15 @@ router.get("/settings", affiliateController.getAffiliateSettings);
  *             properties:
  *               registrationFee:
  *                 type: number
- *                 example: 999
  *               referralCommissionRate:
  *                 type: number
- *                 example: 20
  *               referralCommissionType:
  *                 type: string
  *                 enum: [percentage, fixed]
- *                 example: percentage
  *     responses:
  *       200:
  *         description: Settings updated
  */
 router.patch("/settings", affiliateController.updateAffiliateSettings);
-
-// ── Affiliate Link (User) ─────────────────────────────────────────────────────
-
-/**
- * @openapi
- * /api/affiliates/me/link:
- *   get:
- *     tags: [Affiliates]
- *     summary: Get current user's affiliate referral link
- *     description: Retrieve the authenticated user's unique affiliate referral link.
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Affiliate link retrieved
- *       401:
- *         description: Unauthorized
- */
-router.get("/me/link", affiliateController.getMyAffiliateLink);
 
 export default router;

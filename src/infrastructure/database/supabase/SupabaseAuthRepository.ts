@@ -75,7 +75,11 @@ async function getAffiliateStatus(
     const affiliateRepo = getAffiliateRepository();
     const affiliate = await affiliateRepo.findByUserId(userId);
     if (affiliate) {
-      return affiliate.paymentStatus === "paid" ? affiliate.status : "pending";
+      if (affiliate.paymentStatus !== "paid") {
+        return "pending";
+      }
+      // Exclude "rejected" from valid affiliate statuses
+      return affiliate.status === "rejected" ? "pending" : affiliate.status;
     }
   } catch {
     // Silent fail

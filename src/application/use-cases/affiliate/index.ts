@@ -141,7 +141,7 @@ export {
   type UpdateMyPixelIdOutput,
 } from "./UpdateMyPixelId";
 
-// Payments
+// Payments (DEPRECATED - manual approval now)
 export {
   CreateAffiliatePaymentUseCase,
   type CreateAffiliatePaymentInput,
@@ -152,6 +152,33 @@ export {
   type VerifyAffiliatePaymentInput,
   type VerifyAffiliatePaymentOutput,
 } from "./VerifyAffiliatePayment";
+
+// Manual Approval Workflow
+export {
+  SubmitPaymentProofUseCase,
+  type SubmitPaymentProofInput,
+  type SubmitPaymentProofOutput,
+} from "./SubmitPaymentProof";
+export {
+  ApproveAffiliateUseCase,
+  type ApproveAffiliateInput,
+  type ApproveAffiliateOutput,
+} from "./ApproveAffiliate";
+export {
+  RejectAffiliateUseCase,
+  type RejectAffiliateInput,
+  type RejectAffiliateOutput,
+} from "./RejectAffiliate";
+export {
+  UploadPaymentProofImageUseCase,
+  type UploadPaymentProofImageInput,
+  type UploadPaymentProofImageOutput,
+} from "./UploadPaymentProofImage";
+export {
+  AddPaymentProofByAdminUseCase,
+  type AddPaymentProofByAdminInput,
+  type AddPaymentProofByAdminOutput,
+} from "./AddPaymentProofByAdmin";
 
 // Settings
 export {

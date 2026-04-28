@@ -11,8 +11,10 @@ export const updateAffiliateSchema = z.object({
   name: z.string().min(1, "name cannot be empty").optional(),
   email: z.string().email("Invalid email address").optional(),
   status: z
-    .enum(["active", "suspended"], {
-      errorMap: () => ({ message: "status must be active or suspended" }),
+    .enum(["pending", "active", "suspended", "rejected"], {
+      errorMap: () => ({
+        message: "status must be pending, active, suspended, or rejected",
+      }),
     })
     .optional(),
 });
@@ -49,10 +51,27 @@ export const affiliatePaginatedQuerySchema = z.object({
     .transform((val) => (val ? Number.parseInt(val, 10) : 20)),
   search: z.string().optional(),
   status: z
-    .enum(["active", "suspended"], {
-      errorMap: () => ({ message: "status must be active or suspended" }),
+    .enum(["pending", "active", "suspended", "rejected"], {
+      errorMap: () => ({
+        message: "status must be pending, active, suspended, or rejected",
+      }),
     })
     .optional(),
+});
+
+export const approveAffiliateSchema = z.object({
+  paymentProofUrl: z.string().url("Invalid URL format").optional(),
+  paymentProofRef: z.string().optional(),
+});
+
+export const addPaymentProofByAdminSchema = z.object({
+  paymentProofUrl: z.string().url("Invalid URL format"),
+  paymentProofRef: z.string().optional(),
+});
+
+export const submitPaymentProofSchema = z.object({
+  proofUrl: z.string().url("Invalid URL format"),
+  proofRef: z.string().optional(),
 });
 
 // ── Inferred types ────────────────────────────────────────────────────────────
@@ -65,6 +84,11 @@ export type AffiliateProductParam = z.infer<typeof affiliateProductParamSchema>;
 export type AffiliatePaginatedQuery = z.infer<
   typeof affiliatePaginatedQuerySchema
 >;
+export type ApproveAffiliateInput = z.infer<typeof approveAffiliateSchema>;
+export type AddPaymentProofByAdminInput = z.infer<
+  typeof addPaymentProofByAdminSchema
+>;
+export type SubmitPaymentProofInput = z.infer<typeof submitPaymentProofSchema>;
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -94,6 +118,39 @@ export const validateUpdateAffiliate = (
 ): UpdateAffiliateInput => {
   try {
     return updateAffiliateSchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) handleZodError(error);
+    throw error;
+  }
+};
+
+export const validateApproveAffiliate = (
+  data: unknown,
+): ApproveAffiliateInput => {
+  try {
+    return approveAffiliateSchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) handleZodError(error);
+    throw error;
+  }
+};
+
+export const validateAddPaymentProofByAdmin = (
+  data: unknown,
+): AddPaymentProofByAdminInput => {
+  try {
+    return addPaymentProofByAdminSchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) handleZodError(error);
+    throw error;
+  }
+};
+
+export const validateSubmitPaymentProof = (
+  data: unknown,
+): SubmitPaymentProofInput => {
+  try {
+    return submitPaymentProofSchema.parse(data);
   } catch (error) {
     if (error instanceof z.ZodError) handleZodError(error);
     throw error;
@@ -139,14 +196,3 @@ export const validateAffiliatePaginatedQuery = (
     throw error;
   }
 };
-
-// ── Safe validators ───────────────────────────────────────────────────────────
-
-export const safeValidateCreateAffiliate = (data: unknown) =>
-  createAffiliateSchema.safeParse(data);
-
-export const safeValidateUpdateAffiliate = (data: unknown) =>
-  updateAffiliateSchema.safeParse(data);
-
-export const safeValidateAssignProduct = (data: unknown) =>
-  assignProductSchema.safeParse(data);

@@ -30,7 +30,11 @@ import {
   UpdateAffiliateSettingsUseCase,
   SetAffiliateReferrerUseCase,
   RecordReferralCommissionUseCase,
-  AddCommissionByReferralCodeUseCase,
+  SubmitPaymentProofUseCase,
+  ApproveAffiliateUseCase,
+  RejectAffiliateUseCase,
+  UploadPaymentProofImageUseCase,
+  AddPaymentProofByAdminUseCase,
 } from "../../application/use-cases/affiliate";
 
 import {
@@ -119,14 +123,26 @@ export const activateAffiliate = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     const { id } = validateAffiliateIdParam(req.params);
 
-    // First get to check payment status
+    // First get to check if affiliate can be activated
     const getUseCase = new GetAffiliateUseCase();
     const affiliate = await getUseCase.execute({ affiliateId: id });
 
-    if (!affiliate?.paymentStatus || affiliate.paymentStatus !== "paid") {
+    if (!affiliate) {
+      res.status(404).json({ success: false, message: "Affiliate not found" });
+      return;
+    }
+
+    // Check if affiliate can be activated: either paid OR has submitted proof
+    const canActivate =
+      affiliate.paymentStatus === "paid" ||
+      (affiliate.paymentProofSubmittedAt !== null &&
+        affiliate.paymentProofSubmittedAt !== undefined);
+
+    if (!canActivate) {
       res.status(400).json({
         success: false,
-        message: "Affiliate must complete payment before activation",
+        message:
+          "Affiliate must either complete payment or submit proof of payment before activation",
       });
       return;
     }
@@ -218,8 +234,17 @@ export const getMyAffiliateStatus = catchAsync(
 
     const linkCode = affiliate.affiliateLink ?? null;
 
-    const effectiveStatus =
-      affiliate.paymentStatus === "unpaid" ? "pending" : affiliate.status;
+    // Determine effective status for frontend:
+    // - If rejected → show "rejected"
+    // - If payment unpaid → show "pending"
+    // - Otherwise show actual status (active/suspended)
+    let effectiveStatus = affiliate.status;
+    if (
+      affiliate.paymentStatus === "unpaid" &&
+      affiliate.status !== "rejected"
+    ) {
+      effectiveStatus = "pending";
+    }
 
     sendSuccess(res, {
       id: affiliate.id,
@@ -234,6 +259,13 @@ export const getMyAffiliateStatus = catchAsync(
         : null,
       affiliateLinkCode: linkCode,
       affiliateCommission: affiliate.affiliateCommission ?? 0,
+      // New manual approval fields
+      paymentProofUrl: affiliate.paymentProofUrl ?? null,
+      paymentProofRef: affiliate.paymentProofRef ?? null,
+      paymentProofSubmittedAt: affiliate.paymentProofSubmittedAt ?? null,
+      approvedBy: affiliate.approvedBy ?? null,
+      approvedAt: affiliate.approvedAt ?? null,
+      rejectionReason: affiliate.rejectionReason ?? null,
       createdAt: affiliate.createdAt,
     });
   },
@@ -390,6 +422,174 @@ export const paymongoWebhook = catchAsync(
   },
 );
 
+// ── Manual Approval Workflow ──────────────────────────────────────────────────
+
+export const submitPaymentProof = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = (req as any).user?.id;
+    const { proofUrl, proofRef } = req.body;
+
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    const useCase = new SubmitPaymentProofUseCase();
+    const result = await useCase.execute({ userId, proofUrl, proofRef });
+
+    sendSuccess(res, result, "Payment proof submitted successfully");
+  },
+);
+
+export const approveAffiliate = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const { id } = validateAffiliateIdParam(req.params);
+    const adminId = (req as any).user?.id;
+    const { paymentProofUrl, paymentProofRef } = req.body as {
+      paymentProofUrl?: string | null;
+      paymentProofRef?: string | null;
+    };
+
+    if (!adminId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    const useCase = new ApproveAffiliateUseCase();
+    const affiliate = await useCase.execute({
+      affiliateId: id,
+      adminId,
+      paymentProofUrl,
+      paymentProofRef,
+    });
+
+    sendSuccess(res, affiliate, "Affiliate approved");
+  },
+);
+
+export const rejectAffiliate = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const { id } = validateAffiliateIdParam(req.params);
+    const adminId = (req as any).user?.id;
+    const { reason } = req.body as { reason?: string };
+
+    if (!adminId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    const useCase = new RejectAffiliateUseCase();
+    const affiliate = await useCase.execute({
+      affiliateId: id,
+      reason,
+    });
+
+    sendSuccess(
+      res,
+      affiliate,
+      reason ? `Affiliate rejected: ${reason}` : "Affiliate rejected",
+    );
+  },
+);
+
+// ── Payment Proof Image Upload ───────────────────────────────────────────────────
+
+export const uploadPaymentProofImage = catchAsync(
+  async (
+    req: Request & { file?: Express.Multer.File },
+    res: Response,
+  ): Promise<void> => {
+    const adminId = (req as any).user?.id;
+    const affiliateId = req.params.id as string;
+    const { proofRef } = req.body as { proofRef?: string };
+
+    if (!adminId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    if (!req.file) {
+      res.status(400).json({ success: false, message: "No file provided" });
+      return;
+    }
+
+    const useCase = new UploadPaymentProofImageUseCase();
+    const result = await useCase.execute({
+      affiliateId,
+      file: req.file,
+      proofRef,
+    });
+
+    sendSuccess(res, result, "Payment proof image uploaded successfully");
+  },
+);
+
+// ── Payment Proof Image Upload (User) ─────────────────────────────────────────────
+
+export const uploadMyPaymentProofImage = catchAsync(
+  async (
+    req: Request & { file?: Express.Multer.File },
+    res: Response,
+  ): Promise<void> => {
+    const userId = (req as any).user?.id;
+    const { proofRef } = req.body as { proofRef?: string };
+
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    if (!req.file) {
+      res.status(400).json({ success: false, message: "No file provided" });
+      return;
+    }
+
+    const useCase = new UploadPaymentProofImageUseCase();
+    const result = await useCase.execute({
+      userId,
+      file: req.file,
+      proofRef,
+    });
+
+    sendSuccess(res, result, "Payment proof image uploaded successfully");
+  },
+);
+
+// ── Add Payment Proof By Admin ───────────────────────────────────────────────────
+
+export const addPaymentProofByAdmin = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const adminId = (req as any).user?.id;
+    const affiliateId = req.params.affiliateId as string;
+    const { paymentProofUrl, paymentProofRef } = req.body as {
+      paymentProofUrl: string;
+      paymentProofRef?: string;
+    };
+
+    if (!adminId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    if (!paymentProofUrl) {
+      res
+        .status(400)
+        .json({ success: false, message: "paymentProofUrl is required" });
+      return;
+    }
+
+    const useCase = new AddPaymentProofByAdminUseCase();
+    const result = await useCase.execute({
+      affiliateId,
+      adminId,
+      paymentProofUrl,
+      paymentProofRef,
+    });
+
+    sendSuccess(res, result, "Payment proof added successfully");
+  },
+);
+
 // ── Affiliate Settings (Admin) ─────────────────────────────────────────────────
 
 export const getAffiliateSettings = catchAsync(
@@ -465,29 +665,9 @@ export const triggerReferralCommission = catchAsync(
     });
 
     if (!result) {
-      throw new AppError(
-        "No referral commission recorded. Check if the affiliate has a referrer.",
-        400,
-      );
+      throw new AppError("Failed to record referral commission", 500);
     }
 
     sendSuccess(res, result, "Referral commission recorded");
-  },
-);
-
-// ── Add Commission by Referral Code (Admin) ─────────────────────────────────
-
-export const addCommissionByReferralCode = catchAsync(
-  async (req: Request, res: Response): Promise<void> => {
-    const { referralCode } = req.body;
-
-    if (!referralCode) {
-      throw new AppError("referralCode is required", 400);
-    }
-
-    const useCase = new AddCommissionByReferralCodeUseCase();
-    const result = await useCase.execute({ referralCode });
-
-    sendSuccess(res, result, "Commission added successfully");
   },
 );
