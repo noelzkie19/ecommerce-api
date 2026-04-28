@@ -10,7 +10,7 @@
 
 import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
 import { supabaseAdmin } from "../../../config/supabase";
-import * as paymongoUtils from "../../../utils/paymongo.utils";
+
 import { resolve, TOKENS } from "../../../di/container";
 
 /**
@@ -233,38 +233,11 @@ export class VerifyAffiliatePaymentUseCase {
   async execute(
     input: VerifyAffiliatePaymentInput,
   ): Promise<VerifyAffiliatePaymentOutput> {
-    const status = await paymongoUtils.getPaymentIntentStatus(input.intentId);
-
-    // Ensure affiliate record exists (auto-create if needed)
-    const affiliate = await ensureAffiliateExists(
-      this.affiliateRepository,
-      input.userId,
-      input.affiliateLink,
+    // DEPRECATED: PayMongo payment verification no longer used
+    // Affiliate registration now uses manual approval process
+    throw new Error(
+      "Payment verification deprecated. Affiliate registration now uses manual approval. " +
+        "Admins should use the approve/reject endpoints directly.",
     );
-
-    // Already confirmed - idempotent guard
-    if (affiliate.paymentStatus === "paid") {
-      return {
-        success: true,
-        status: "already_confirmed",
-        alreadyConfirmed: true,
-      };
-    }
-
-    if (status === "succeeded") {
-      return processSuccessfulPayment(
-        this.affiliateRepository,
-        input.userId,
-        affiliate.id,
-        affiliate.referredBy,
-        input.affiliateLink,
-      );
-    }
-
-    if (status === "payment_intent.payment_failed") {
-      return { success: false, status };
-    }
-
-    return { success: false, status };
   }
 }

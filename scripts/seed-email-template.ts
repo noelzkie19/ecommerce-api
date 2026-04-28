@@ -754,10 +754,10 @@ support@nanu-health.com`,
     name: "Affiliate Welcome",
     description: "Sent when a new affiliate registers",
     category: "affiliate",
-    subject: "Welcome to the Nanu Health Affiliate Program!",
+    subject: "Affiliate Application Received – Awaiting Approval",
     html_body: wrap(
       preheader(
-        "Your affiliate application has been received. Here's what happens next.",
+        "Your affiliate application has been received. Please submit proof of payment to proceed.",
       ),
       `
       ${heroBanner("Welcome to Our Affiliate Program! 🎉", "Application received")}
@@ -774,41 +774,109 @@ support@nanu-health.com`,
 
           ${detailsTable([
             { label: "Affiliate ID", value: "{{affiliate_id}}" },
-            { label: "Status", value: "Pending Review" },
+            { label: "Status", value: "Pending Approval" },
             {
               label: "Your Affiliate Link",
               value: "{{affiliate_link}}",
             },
           ])}
 
-          ${callout(
-            `
-            <strong>What happens next?</strong><br>
-            Our team will carefully review your application within <strong>24–48 business hours</strong>. You'll receive an email notification once a decision has been made.
-            In the meantime, feel free to explore our product catalogue to prepare your marketing approach.
-          `,
-            "green",
-          )}
+           ${callout(
+             `
+             <strong>Next Steps:</strong><br>
+             1. Send your proof of payment (payment receipt or reference number) to our admin through our messenger.<br>
+             2. Our admin team will review your submission within <strong>24–48 business hours</strong>.<br>
+             3. You'll receive an email notification once your application is approved or rejected.
+           `,
+             "green",
+           )}
         </td>
       </tr>
 
       ${footer()}
     `,
     ),
-    text_body: `Welcome to Our Affiliate Program!
+    text_body: `Affiliate Application Received – Awaiting Approval
+ 
+ Hi {{affiliate_name}},
+ 
+ Thank you for applying to the Nanu Health Affiliate Program!
+ 
+ Affiliate ID: {{affiliate_id}}
+ Affiliate Link: {{affiliate_link}}
+ Status: Pending Approval
+ 
+ Next Steps:
+ 1. Send your proof of payment to our admin through our messenger.
+ 2. Our admin team will review within 24–48 business hours.
+ 3. You'll be notified once your application is approved.
+ 
+ © {{year}} Nanu Health Shop. All rights reserved.
+ support@nanu-health.com`,
+    is_active: true,
+  },
 
-Hi {{affiliate_name}},
+  // ── AFFILIATE PAYMENT PROOF SUBMITTED ─────────────────────────────────────────
+  {
+    template_key: "affiliate_payment_proof_submitted",
+    name: "Payment Proof Submitted",
+    description: "Notifies admin that an affiliate has submitted payment proof",
+    category: "affiliate",
+    subject: "New Affiliate Payment Proof Submitted",
+    html_body: wrap(
+      preheader("An affiliate has submitted proof of payment for review."),
+      `
+      ${heroBanner("Payment Proof Submitted", "Review required")}
+      ${accentStrip()}
 
-Thank you for applying to the Nanu Health Affiliate Program!
+      <tr>
+        <td style="padding: 36px 36px 28px;">
+          <p style="margin:0 0 16px; font-family:${DS.font.body}; font-size:16px; color:${DS.color.textBody}; line-height:1.7;">
+            Hello Admin,
+          </p>
+          <p style="margin:0 0 24px; font-family:${DS.font.body}; font-size:15px; color:${DS.color.textBody}; line-height:1.7;">
+            A new affiliate has submitted their proof of payment. Please review and approve or reject their application.
+          </p>
 
+          ${detailsTable([
+            { label: "Affiliate Name", value: "{{affiliate_name}}" },
+            { label: "Affiliate Email", value: "{{affiliate_email}}" },
+            { label: "Affiliate ID", value: "{{affiliate_id}}" },
+            { label: "Proof URL", value: "{{proof_url}}" },
+            { label: "Reference/Note", value: "{{proof_ref}}" },
+          ])}
+
+          ${callout(
+            `
+            <strong>Action Required:</strong><br>
+            Please review this affiliate's submission and either approve or reject their application from the admin dashboard.
+          `,
+            "yellow",
+          )}
+
+          ${btn("Go to Admin Dashboard", "{{admin_dashboard_url}}")}
+        </td>
+      </tr>
+
+      ${footer()}
+    `,
+    ),
+    text_body: `Payment Proof Submitted for Review
+
+Hello Admin,
+
+An affiliate has submitted proof of payment for review.
+
+Affiliate Name: {{affiliate_name}}
+Affiliate Email: {{affiliate_email}}
 Affiliate ID: {{affiliate_id}}
-Affiliate Link: {{affiliate_link}}
-Status: Pending Review
+Proof URL: {{proof_url}}
+Reference/Note: {{proof_ref}}
 
-Our team will review your application within 24–48 business hours. You'll receive an email once a decision has been made.
+Please visit the admin dashboard to approve or reject this application:
+{{admin_dashboard_url}}
 
-© {{year}} Nanu Health Shop. All rights reserved.
-support@nanu-health.com`,
+© {{year}} Nanu Health Shop. All rights reserved.`,
     is_active: true,
   },
 
@@ -1195,11 +1263,7 @@ async function seedEmailTemplates() {
     "🌱 Starting email templates seed (Professional Orange Theme)...\n",
   );
 
-  const allTemplates = [
-    ...orderTemplates,
-    ...affiliateTemplates,
-    ...authTemplates,
-  ];
+  const allTemplates = [...affiliateTemplates];
 
   for (const template of allTemplates) {
     try {

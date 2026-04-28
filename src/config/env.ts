@@ -22,6 +22,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("Triad365 <noreply@triad365.com>"),
   EMAIL_REPLY_TO: z.string().default("support@triad365.com"),
+  ADMIN_EMAIL: z.string().email().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

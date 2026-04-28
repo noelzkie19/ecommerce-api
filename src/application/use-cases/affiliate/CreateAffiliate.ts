@@ -36,6 +36,12 @@ export interface CreateAffiliateOutput {
   totalSales: number;
   totalCommissions: number;
   affiliateCommission: number;
+  paymentProofUrl: string | null;
+  paymentProofRef: string | null;
+  paymentProofSubmittedAt: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  rejectionReason: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -68,12 +74,19 @@ export class CreateAffiliateUseCase {
 
     const affiliate = await this.affiliateRepository.create(affiliateProps);
 
+    // Generate affiliate link immediately (manual approval flow)
+    await this.affiliateRepository.generateAndSetAffiliateLink(input.userId);
+
     // Send welcome email (non-blocking)
     this.sendWelcomeEmail(input.email, input.name).catch((err) =>
       console.error("Failed to send affiliate welcome email:", err),
     );
 
-    return affiliate.toResponse();
+    // Re-fetch affiliate to get the generated link
+    const updatedAffiliate = await this.affiliateRepository.findByUserId(
+      input.userId,
+    );
+    return updatedAffiliate?.toResponse() ?? affiliate.toResponse();
   }
 
   /**

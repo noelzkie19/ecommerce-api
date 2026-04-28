@@ -1,24 +1,26 @@
 /**
- * Activate Affiliate Use Case
+ * Reject Affiliate Use Case
  *
- * Activates an affiliate.
+ * Admin action to reject an affiliate application.
+ * Sets status to 'rejected' and stores an optional reason.
  */
 
 import { IAffiliateRepository } from "../../../domain/interfaces/IAffiliateRepository";
-import { resolve, TOKENS } from "../../../di/container";
 import { SendTemplateEmailUseCase } from "../email/SendTemplateEmail";
+import { resolve, TOKENS } from "../../../di/container";
 
 /**
- * Input DTO for ActivateAffiliateUseCase
+ * Input DTO for RejectAffiliateUseCase
  */
-export interface ActivateAffiliateInput {
+export interface RejectAffiliateInput {
   affiliateId: string;
+  reason?: string;
 }
 
 /**
- * Output DTO for ActivateAffiliateUseCase
+ * Output DTO for RejectAffiliateUseCase
  */
-export interface ActivateAffiliateOutput {
+export interface RejectAffiliateOutput {
   id: string;
   userId: string;
   email: string;
@@ -43,9 +45,9 @@ export interface ActivateAffiliateOutput {
 }
 
 /**
- * Activate Affiliate Use Case
+ * Reject Affiliate Use Case
  */
-export class ActivateAffiliateUseCase {
+export class RejectAffiliateUseCase {
   private readonly affiliateRepository: IAffiliateRepository;
   private readonly sendTemplateEmailUseCase: SendTemplateEmailUseCase;
 
@@ -59,9 +61,7 @@ export class ActivateAffiliateUseCase {
   /**
    * Execute the use case
    */
-  async execute(
-    input: ActivateAffiliateInput,
-  ): Promise<ActivateAffiliateOutput> {
+  async execute(input: RejectAffiliateInput): Promise<RejectAffiliateOutput> {
     const affiliate = await this.affiliateRepository.findById(
       input.affiliateId,
     );
@@ -70,52 +70,47 @@ export class ActivateAffiliateUseCase {
       throw new Error("Affiliate not found");
     }
 
-    if (!affiliate.canBeActivated()) {
-      throw new Error(
-        "Affiliate cannot be activated. Payment may not be completed.",
-      );
-    }
-
-    const activated = affiliate.activate();
-
-    // Update in repository
-    await this.affiliateRepository.update(input.affiliateId, {
-      status: "active",
-    });
-
-    // Send activation email (non-blocking)
-    this.sendActivationEmail(
-      activated.email,
-      activated.name,
-      activated.affiliateLink,
-    ).catch((err) =>
-      console.error("Failed to send affiliate activation email:", err),
+    // Reject the affiliate
+    const rejected = await this.affiliateRepository.rejectAffiliate(
+      input.affiliateId,
+      input.reason,
     );
 
-    return activated.toResponse();
+    // Send rejection email to affiliate (non-blocking)
+    this.sendRejectionEmail(rejected, input.reason).catch((err) =>
+      console.error("Failed to send rejection email:", err),
+    );
+
+    return rejected.toResponse();
   }
 
   /**
-   * Send activation email to affiliate
+   * Send rejection email to affiliate
    */
-  private async sendActivationEmail(
-    email: string,
-    name: string,
-    affiliateLink: string | null,
+  private async sendRejectionEmail(
+    affiliate: {
+      id: string;
+      email: string;
+      name: string;
+      rejectionReason: string | null;
+    },
+    reason?: string,
   ): Promise<void> {
     try {
       await this.sendTemplateEmailUseCase.execute({
-        to: email,
-        templateKey: "affiliate_activated",
+        to: affiliate.email,
+        templateKey: "affiliate_rejected",
         variables: {
-          affiliate_name: name,
-          affiliate_link: affiliateLink || "N/A",
-          dashboard_url: `${process.env.FRONTEND_URL}/affiliate/dashboard`,
+          affiliate_name: affiliate.name,
+          affiliate_id: affiliate.id,
+          rejection_reason:
+            reason || affiliate.rejectionReason || "Not specified",
+          support_email: "support@example.com",
           year: new Date().getFullYear().toString(),
         },
       });
     } catch (error) {
-      console.error("Error sending affiliate activation email:", error);
+      console.error("Failed to send rejection email:", error);
     }
   }
 }
